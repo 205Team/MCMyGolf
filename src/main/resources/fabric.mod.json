@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "id": "mygolf",
+  "version": "${version}",
+
+  "name": "MyGolf Mod",
+  "description": "Play Golf!",
+  "authors": [
+    "shijiezheng",
+    "sensof"
+  ],
+  "contact": {
+    "sources": "https://github.com/205Team/MCMyGolf"
+  },
+
+  "license": "CC0-1.0",
+  "icon": "assets/mygolf/icon.png",
+
+  "environment": "*",
+  "entrypoints": {
+    "main": [
+      "net.fabricmc.mygolf.MyGolfMod"
+    ]
+  },
+  "mixins": [
+    "mygolf.mixins.json"
+  ],
+
+  "depends": {
+    "fabricloader": ">=0.14.10",
+    "fabric-api": "*",
+    "minecraft": "~1.19",
+    "java": ">=17"
+  },
+  "suggests": {
+    "another-mod": "*"
+  }
+}
