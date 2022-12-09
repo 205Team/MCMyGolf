@@ -8,6 +8,8 @@ public class CommonStr {
     //! 仅支持 [a-z0-9/._-]，否则crash
     final public class ItemCodeName {
         final public static String GolfItem = "golf_item";  //高尔夫球代号
+        final public static String FlagstickItem = "flagstick_item";  //红旗杆代号
+        final public static String GolfClubItem = "golf_club_item";  //高尔夫球杆代号
     }
 
 

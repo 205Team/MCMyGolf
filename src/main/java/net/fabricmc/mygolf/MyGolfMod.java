@@ -23,7 +23,5 @@ public class MyGolfMod implements ModInitializer {
 		LOGGER.info("Hello Fabric world!");
 	}
 
-
-
 }
 
