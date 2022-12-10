@@ -4,17 +4,17 @@ import net.fabricmc.mygolf.items.base.BaseItem;
 import net.minecraft.item.ItemGroup;
 
 //item：棒球
-public class Golf extends BaseItem {
+public class GolfBall extends BaseItem {
 
     static int maxCount = 4;    //最大堆叠数量
 
-    public Golf(Settings settings) {
+    public GolfBall(Settings settings) {
         super(settings);
     }
 
     //初始化方法
-    public static Golf defaultItem() {
-        return new Golf(defaultSetting());
+    public static GolfBall defaultItem() {
+        return new GolfBall(defaultSetting());
     }
 
     //默认设置

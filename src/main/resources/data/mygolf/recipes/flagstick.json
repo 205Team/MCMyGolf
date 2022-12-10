@@ -1,0 +1,20 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    " RI",
+    "RRI",
+    "  I"
+  ],
+  "key": {
+    "R": {
+      "item": "minecraft:red_wool"
+    },
+    "I": {
+      "item": "mygolf:ironstick"
+    }
+  },
+  "result": {
+    "item": "mygolf:flagstick",
+    "count": 1
+  }
+}
