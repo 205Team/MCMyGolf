@@ -1,6 +1,6 @@
 {
-  "item.mygolf.golf": "高尔夫球",
+  "item.mygolf.golf_ball": "高尔夫球",
   "item.mygolf.flagstick": "红旗杆",
-  "item.mygolf.golfclub": "高尔夫球杆",
-  "item.mygolf.ironstick": "铁棍"
+  "item.mygolf.golf_club": "高尔夫球杆",
+  "item.mygolf.iron_stick": "铁棍"
 }

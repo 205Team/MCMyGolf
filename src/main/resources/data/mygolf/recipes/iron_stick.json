@@ -1,20 +1,17 @@
 {
   "type": "minecraft:crafting_shaped",
   "pattern": [
-    " S ",
-    " S ",
-    "I  "
+    " I ",
+    " I ",
+    " I "
   ],
   "key": {
-    "S": {
-      "item": "mygolf:ironstick"
-    },
     "I": {
       "item": "minecraft:iron_ingot"
     }
   },
   "result": {
-    "item": "mygolf:golfclub",
-    "count": 1
+    "item": "mygolf:iron_stick",
+    "count": 2
   }
 }

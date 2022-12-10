@@ -1,5 +1,6 @@
 package net.fabricmc.mygolf.items.base;
 
+import net.fabricmc.mygolf.tools.StringTool;
 import net.minecraft.item.Item;
 //物品抽象类
 public abstract class BaseItem extends Item implements ItemAbstract{
@@ -13,6 +14,6 @@ public abstract class BaseItem extends Item implements ItemAbstract{
      * @return item的代号
      */
     public String codeName() {
-        return getClass().getSimpleName().toLowerCase();
+        return StringTool.getItemId(getClass().getSimpleName());
     }
 }

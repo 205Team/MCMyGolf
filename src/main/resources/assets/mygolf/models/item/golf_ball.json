@@ -1,6 +1,6 @@
 {
   "parent": "builtin/generated",
   "textures": {
-    "layer0": "mygolf:item/golfclub"
+    "layer0": "mygolf:item/golf_ball"
   }
 }

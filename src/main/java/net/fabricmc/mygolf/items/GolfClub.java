@@ -2,6 +2,7 @@ package net.fabricmc.mygolf.items;
 
 import net.fabricmc.mygolf.items.base.BaseItem;
 import net.fabricmc.mygolf.items.base.ItemAbstract;
+import net.fabricmc.mygolf.tools.StringTool;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemGroup;
 import net.minecraft.item.SwordItem;
@@ -29,6 +30,6 @@ public class GolfClub extends SwordItem implements ItemAbstract {
 
     @Override
     public String codeName() {
-        return getClass().getSimpleName().toLowerCase();
+        return StringTool.getItemId(getClass().getSimpleName()); 
     }
 }
