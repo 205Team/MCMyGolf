@@ -3,7 +3,7 @@ package net.fabricmc.mygolf.items;
 import net.fabricmc.mygolf.items.base.BaseItem;
 import net.minecraft.item.ItemGroup;
 
-//item：棒球
+//item：高尔夫球
 public class GolfBall extends BaseItem {
 
     static int maxCount = 4;    //最大堆叠数量
