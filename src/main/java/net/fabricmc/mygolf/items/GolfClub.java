@@ -1,9 +1,7 @@
 package net.fabricmc.mygolf.items;
 
-import net.fabricmc.mygolf.items.base.BaseItem;
 import net.fabricmc.mygolf.items.base.ItemAbstract;
 import net.fabricmc.mygolf.tools.StringTool;
-import net.minecraft.item.Item;
 import net.minecraft.item.ItemGroup;
 import net.minecraft.item.SwordItem;
 import net.minecraft.item.ToolMaterial;
@@ -14,7 +12,7 @@ public class GolfClub extends SwordItem implements ItemAbstract {
     }
 
     //初始化方法
-    public static GolfClub defaultItem() {
+    public static GolfClub defaultInstance() {
         return new GolfClub(defaultToolMaterial(), 3, -2.4F, defaultSetting());
     }
 
@@ -30,6 +28,6 @@ public class GolfClub extends SwordItem implements ItemAbstract {
 
     @Override
     public String codeName() {
-        return StringTool.getItemId(getClass().getSimpleName()); 
+        return StringTool.getIdFrom(getClass().getSimpleName());
     }
 }

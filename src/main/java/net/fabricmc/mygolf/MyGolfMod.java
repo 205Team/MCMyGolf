@@ -20,6 +20,8 @@ public class MyGolfMod implements ModInitializer {
 
 		//注册物品
 		RegisterItems.registryItems();
+		//注册方块
+		RegisterBlocks.registryBlocks();
 		LOGGER.info("Hello Fabric world!");
 	}
 

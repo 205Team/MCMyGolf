@@ -14,6 +14,6 @@ public abstract class BaseItem extends Item implements ItemAbstract{
      * @return item的代号
      */
     public String codeName() {
-        return StringTool.getItemId(getClass().getSimpleName());
+        return StringTool.getIdFrom(getClass().getSimpleName());
     }
 }

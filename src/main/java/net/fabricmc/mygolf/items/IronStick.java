@@ -12,7 +12,7 @@ import net.minecraft.item.ItemGroup;
     }
 
     //初始化方法
-    public static IronStick defaultItem() {
+    public static IronStick defaultInstance() {
         return new IronStick(defaultSetting());
     }
 

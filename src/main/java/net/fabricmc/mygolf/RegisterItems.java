@@ -17,10 +17,10 @@ public class RegisterItems {
     /**
      * 物品声明
      */
-    public static final GolfBall GOLF_BALL_ITEM = GolfBall.defaultItem();            //高尔夫球
-    public static final Flagstick FLAGSTICK_ITEM = Flagstick.defaultItem();     //红旗杆
-    public static final GolfClub GOLF_CLUB_TOOL = GolfClub.defaultItem();       //高尔夫球杆
-    public static final IronStick IRON_STICK_ITEM = IronStick.defaultItem();       //铁棒
+    public static final GolfBall GOLF_BALL_ITEM = GolfBall.defaultInstance();            //高尔夫球
+    public static final Flagstick FLAGSTICK_ITEM = Flagstick.defaultInstance();     //红旗杆
+    public static final GolfClub GOLF_CLUB_TOOL = GolfClub.defaultInstance();       //高尔夫球杆
+    public static final IronStick IRON_STICK_ITEM = IronStick.defaultInstance();       //铁棒
     /**
      * 注册物品
      */

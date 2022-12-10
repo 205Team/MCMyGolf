@@ -13,7 +13,7 @@ public class GolfBall extends BaseItem {
     }
 
     //初始化方法
-    public static GolfBall defaultItem() {
+    public static GolfBall defaultInstance() {
         return new GolfBall(defaultSetting());
     }
 

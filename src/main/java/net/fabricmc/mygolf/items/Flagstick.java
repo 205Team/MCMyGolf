@@ -12,7 +12,7 @@ public class Flagstick extends BaseItem {
     }
 
     //初始化方法
-    public static Flagstick defaultItem() {
+    public static Flagstick defaultInstance() {
         return new Flagstick(defaultSetting());
     }
 
