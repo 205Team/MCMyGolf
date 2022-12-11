@@ -1,6 +1,6 @@
 {
   "parent": "block/cube_all",
   "textures": {
-    "all": "mygolf:block/golf_ball_block"
+    "all": "mygolf:block/golf_ball"
   }
 }

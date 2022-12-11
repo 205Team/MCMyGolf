@@ -16,4 +16,5 @@ public abstract class BaseBlock extends Block implements BlockAbstract {
     public String codeName() {
         return StringTool.getIdFrom(getClass().getSimpleName());
     }
+
 }
