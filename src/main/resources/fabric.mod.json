@@ -20,6 +20,9 @@
   "entrypoints": {
     "main": [
       "net.fabricmc.mygolf.MyGolfMod"
+    ],
+    "client": [
+      "net.fabricmc.mygolf.EntityTestingClient"
     ]
   },
   "mixins": [
