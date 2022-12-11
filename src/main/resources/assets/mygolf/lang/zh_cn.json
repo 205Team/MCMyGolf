@@ -1,6 +1,7 @@
 {
   "block.mygolf.golf_ball": "高尔夫球",
   "block.mygolf.flagstick": "红旗杆",
+  "block.mygolf.golf_hole": "球洞",
   "item.mygolf.golf_club": "高尔夫球杆",
   "item.mygolf.iron_stick": "铁棍"
 }

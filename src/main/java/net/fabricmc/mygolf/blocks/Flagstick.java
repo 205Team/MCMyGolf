@@ -1,5 +1,6 @@
 package net.fabricmc.mygolf.blocks;
 
+import net.fabricmc.mygolf.RegisterBlocks;
 import net.fabricmc.mygolf.blocks.base.BaseBlock;
 import net.minecraft.block.*;
 import net.minecraft.entity.player.PlayerEntity;
@@ -53,9 +54,12 @@ public class Flagstick extends BaseBlock {
 
     @Override
     public void onBlockAdded(BlockState state, World world, BlockPos pos, BlockState oldState, boolean notify){
-        Block downBlock = world.getBlockState(pos.down()).getBlock();
-        if(downBlock == Blocks.GRASS_BLOCK)
-            System.out.println("w");
         //检查下方一个方块是不是草/泥方块，是就在下面挖洞
+        BlockPos downBlockPos = pos.down();
+        Block downBlock = world.getBlockState(downBlockPos).getBlock();
+        BlockState golfHoleState = RegisterBlocks.GOLF_HOLE.getDefaultState();
+        if(downBlock == Blocks.GRASS_BLOCK || downBlock == Blocks.DIRT){
+            world.setBlockState(downBlockPos, golfHoleState);
+        }
     }
 }
