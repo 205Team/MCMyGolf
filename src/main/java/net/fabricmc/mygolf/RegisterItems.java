@@ -1,7 +1,6 @@
 package net.fabricmc.mygolf;
 
 import net.fabricmc.mygolf.global.CommonStr;
-import net.fabricmc.mygolf.items.Flagstick;
 import net.fabricmc.mygolf.items.GolfClub;
 import net.fabricmc.mygolf.items.IronStick;
 import net.fabricmc.mygolf.items.base.BaseItem;
@@ -16,14 +15,12 @@ public class RegisterItems {
     /**
      * 物品声明
      */
-    public static final Flagstick FLAGSTICK_ITEM = Flagstick.defaultInstance();     //红旗杆
     public static final GolfClub GOLF_CLUB_TOOL = GolfClub.defaultInstance();       //高尔夫球杆
     public static final IronStick IRON_STICK_ITEM = IronStick.defaultInstance();       //铁棒
     /**
      * 注册物品
      */
     public static void registryItems() {
-        registryItem(FLAGSTICK_ITEM);
         registryItem(GOLF_CLUB_TOOL,GOLF_CLUB_TOOL.codeName());
         registryItem(IRON_STICK_ITEM);
     }

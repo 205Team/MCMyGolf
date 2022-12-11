@@ -1,6 +1,11 @@
 {
-  "parent": "builtin/generated",
+  "parent": "minecraft:item/handheld",
   "textures": {
     "layer0": "mygolf:item/flagstick"
+  },
+  "display": {
+    "thirdperson_righthand": {
+      "translation": [-5, 2.5, 0]
+    }
   }
 }

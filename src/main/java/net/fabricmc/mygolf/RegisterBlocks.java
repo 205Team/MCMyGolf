@@ -1,5 +1,6 @@
 package net.fabricmc.mygolf;
 
+import net.fabricmc.mygolf.blocks.Flagstick;
 import net.fabricmc.mygolf.blocks.GolfBall;
 import net.fabricmc.mygolf.blocks.base.BaseBlock;
 import net.fabricmc.mygolf.global.CommonStr;
@@ -14,12 +15,14 @@ public class RegisterBlocks {
      * 方块声明
      */
     public static final GolfBall GOLF_BALL = GolfBall.defaultInstance();    //高尔夫球方块
+    public static final Flagstick FLAGSTICK = Flagstick.defaultInstance();    //高尔夫球方块
 
     /**
      * 注册方块
      */
     public static void registryBlocks() {
         registryBlock(GOLF_BALL);
+        registryBlock(FLAGSTICK);
     }
 
     /**

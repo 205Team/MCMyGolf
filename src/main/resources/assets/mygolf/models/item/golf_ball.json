@@ -2,5 +2,11 @@
   "parent": "builtin/generated",
   "textures": {
     "layer0": "mygolf:item/golf_ball"
+  },
+  "display": {
+    "thirdperson_righthand": {
+      "translation": [-2, 3, -2],
+      "scale": [0.5, 0.5, 0.5]
+    }
   }
 }
