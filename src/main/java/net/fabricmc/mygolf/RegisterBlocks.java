@@ -4,6 +4,7 @@ import net.fabricmc.mygolf.blocks.Flagstick;
 import net.fabricmc.mygolf.blocks.GolfBall;
 import net.fabricmc.mygolf.blocks.GolfHole;
 import net.fabricmc.mygolf.blocks.base.BaseBlock;
+import net.fabricmc.mygolf.blocks.base.BaseBlockWithEntity;
 import net.fabricmc.mygolf.global.CommonStr;
 import net.minecraft.block.Block;
 import net.minecraft.item.BlockItem;
@@ -36,6 +37,14 @@ public class RegisterBlocks {
         registryBlock(block, block.codeName(), block.itemDefaultSetting());
     }
 
+
+    /**
+     * 注册新BaseBlockWithEntity
+     * @param block 物品
+     */
+    public static void registryBlockWithEntity(BaseBlockWithEntity block) {
+        registryBlock(block, block.codeName(), block.itemDefaultSetting());
+    }
 
     /**
      * 注册新block
