@@ -1,11 +1,15 @@
 package net.fabricmc.mygolf;
 
+import net.fabricmc.mygolf.blockEntity.FlagstickEntity;
 import net.fabricmc.mygolf.blocks.Flagstick;
 import net.fabricmc.mygolf.blocks.GolfHole;
 import net.fabricmc.mygolf.blocks.base.BaseBlock;
+import net.fabricmc.mygolf.blockEntity.base.BaseBlockEntity;
 import net.fabricmc.mygolf.blocks.base.BaseBlockWithEntity;
 import net.fabricmc.mygolf.global.CommonStr;
 import net.minecraft.block.Block;
+import net.minecraft.block.entity.BlockEntity;
+import net.minecraft.block.entity.BlockEntityType;
 import net.minecraft.item.BlockItem;
 import net.minecraft.item.Item;
 import net.minecraft.util.Identifier;
@@ -16,6 +20,7 @@ public class RegisterBlocks {
      * 方块声明
      */
     public static final Flagstick FLAGSTICK = Flagstick.defaultInstance();    //红旗杆方块
+    public static final GolfBall GOLF_BALL = GolfBall.defaultInstance();    //高尔夫球方块
     public static final GolfHole GOLF_HOLE = GolfHole.defaultInstance();    //球洞方块
 
     /**
@@ -23,6 +28,7 @@ public class RegisterBlocks {
      */
     public static void registryBlocks() {
         registryBlock(FLAGSTICK);
+        registryBlock(GOLF_BALL);
         registryBlock(GOLF_HOLE);
     }
 
@@ -34,12 +40,11 @@ public class RegisterBlocks {
         registryBlock(block, block.codeName(), block.itemDefaultSetting());
     }
 
-
     /**
      * 注册新BaseBlockWithEntity
      * @param block 物品
      */
-    public static void registryBlockWithEntity(BaseBlockWithEntity block) {
+    public static void registryBlock(BaseBlockWithEntity block) {
         registryBlock(block, block.codeName(), block.itemDefaultSetting());
     }
 

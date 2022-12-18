@@ -1,7 +1,9 @@
 package net.fabricmc.mygolf;
 
 import net.fabricmc.api.ModInitializer;
+import net.fabricmc.mygolf.blockEntity.FlagstickEntity;
 import net.fabricmc.mygolf.global.CommonStr;
+import net.minecraft.block.entity.BlockEntityType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -24,6 +26,9 @@ public class MyGolfMod implements ModInitializer {
 		RegisterBlocks.registryBlocks();
 		//注册实体
 		RegisterEntities.registryEntities();
+
+		new RegisterBlockEntities();
+
 		LOGGER.info("Hello Fabric world!");
 	}
 
