@@ -3,8 +3,10 @@ package net.fabricmc.mygolf;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
+import net.fabricmc.fabric.api.client.rendering.v1.BlockEntityRendererRegistry;
 import net.fabricmc.fabric.api.client.rendering.v1.EntityModelLayerRegistry;
 import net.fabricmc.fabric.api.client.rendering.v1.EntityRendererRegistry;
+import net.fabricmc.mygolf.blockEntity.render.FlagstickEntityRenderer;
 import net.fabricmc.mygolf.entity.model.GolfBallEntityModel;
 import net.fabricmc.mygolf.entity.renderer.GolfBallEntityRenderer;
 import net.fabricmc.mygolf.global.CommonStr;
@@ -12,7 +14,7 @@ import net.minecraft.client.render.entity.model.EntityModelLayer;
 import net.minecraft.util.Identifier;
 
 @Environment(EnvType.CLIENT)
-public class EntityTestingClient implements ClientModInitializer {
+public class MyGolfModClient implements ClientModInitializer {
     public static final EntityModelLayer MODEL_CUBE_LAYER = new EntityModelLayer(new Identifier(CommonStr.modId, "golf_ball"), "main");
     @Override
     public void onInitializeClient() {
@@ -28,5 +30,7 @@ public class EntityTestingClient implements ClientModInitializer {
         });
 
         EntityModelLayerRegistry.registerModelLayer(MODEL_CUBE_LAYER, GolfBallEntityModel::getTexturedModelData);
+
+        BlockEntityRendererRegistry.register(RegisterBlockEntities.FLAGSTICK_ENTITY, FlagstickEntityRenderer::new);
     }
 }

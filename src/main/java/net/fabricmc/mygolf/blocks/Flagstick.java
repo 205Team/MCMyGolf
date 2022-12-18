@@ -5,20 +5,16 @@ import net.fabricmc.mygolf.blockEntity.FlagstickEntity;
 import net.fabricmc.mygolf.blocks.base.BaseBlockWithEntity;
 import net.minecraft.block.*;
 import net.minecraft.block.entity.BlockEntity;
-import net.minecraft.block.entity.HopperBlockEntity;
 import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.inventory.Inventory;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemGroup;
 import net.minecraft.item.ItemPlacementContext;
 import net.minecraft.state.StateManager;
 import net.minecraft.state.property.IntProperty;
 import net.minecraft.state.property.Properties;
-import net.minecraft.state.property.Property;
 import net.minecraft.text.Text;
-import net.minecraft.util.ActionResult;
-import net.minecraft.util.BlockMirror;
-import net.minecraft.util.BlockRotation;
-import net.minecraft.util.Hand;
+import net.minecraft.util.*;
 import net.minecraft.util.hit.BlockHitResult;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.MathHelper;
@@ -28,8 +24,9 @@ import net.minecraft.world.BlockView;
 import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
 
-public class Flagstick extends BaseBlockWithEntity  {
+public class Flagstick extends BaseBlockWithEntity implements BlockEntityProvider {
     static int maxCount = 1;    //最大堆叠数量
+    private boolean isWithHole = false;
     public static final IntProperty ROTATION;
     protected static final VoxelShape SHAPE;
     static {
@@ -84,12 +81,21 @@ public class Flagstick extends BaseBlockWithEntity  {
         BlockState golfHoleState = RegisterBlocks.GOLF_HOLE.getDefaultState();
         if(downBlock == Blocks.GRASS_BLOCK || downBlock == Blocks.DIRT){
             world.setBlockState(downBlockPos, golfHoleState);
+            isWithHole = true;
         }
     }
+
     @Override
-    public BlockRenderType getRenderType(BlockState state) {
-        return BlockRenderType.MODEL;
+    public void onStateReplaced(BlockState state, World world, BlockPos pos, BlockState newState, boolean moved) {
+        if (!state.isOf(newState.getBlock())) {
+            if (isWithHole && world.getBlockState(pos.down()) == RegisterBlocks.GOLF_HOLE.getDefaultState()) {
+                world.setBlockState(pos.down(), Blocks.GRASS_BLOCK.getDefaultState());
+
+            }
+
+        }
     }
+
     @Override
     public BlockState getPlacementState(ItemPlacementContext ctx) {
         return this.getDefaultState().with(ROTATION, MathHelper.floor((double)(ctx.getPlayerYaw() * 16.0F / 360.0F) + 0.5) & 15);
@@ -104,7 +110,7 @@ public class Flagstick extends BaseBlockWithEntity  {
     }
     @Override
     protected void appendProperties(StateManager.Builder<Block, BlockState> builder) {
-        builder.add(new Property[]{ROTATION});
+        builder.add(ROTATION);
     }
     @Nullable
     @Override

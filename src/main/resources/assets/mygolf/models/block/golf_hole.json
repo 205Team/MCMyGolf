@@ -2,9 +2,7 @@
 	"credit": "Made with Blockbench",
 	"texture_size": [32, 32],
 	"textures": {
-		"1": "mygolf:block/golf_hole",
-		"2": "mygolf:block/flagstick",
-		"particle": "mygolf:block/flagstick"
+		"1": "mygolf:block/golf_hole"
 	},
 	"elements": [
 		{
@@ -305,18 +303,6 @@
 				"west": {"uv": [0, 0, 1, 7], "texture": "#1"},
 				"up": {"uv": [8.5, 14.5, 9.5, 15.5], "texture": "#1"},
 				"down": {"uv": [0, 0, 1, 1], "texture": "#1"}
-			}
-		},
-		{
-			"from": [7, 2, 7],
-			"to": [9, 16, 9],
-			"faces": {
-				"north": {"uv": [0, 0, 1, 15], "texture": "#2"},
-				"east": {"uv": [1, 0, 2, 15], "texture": "#2"},
-				"south": {"uv": [0, 0, 1, 15], "texture": "#2"},
-				"west": {"uv": [1, 0, 2, 15], "texture": "#2"},
-				"up": {"uv": [5, 1, 4, 0], "texture": "#2"},
-				"down": {"uv": [5, 1, 4, 2], "texture": "#2"}
 			}
 		}
 	]

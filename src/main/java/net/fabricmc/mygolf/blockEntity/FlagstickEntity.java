@@ -25,7 +25,6 @@ public class FlagstickEntity extends BlockEntity {
     public Packet<ClientPlayPacketListener> toUpdatePacket() {
         return BlockEntityUpdateS2CPacket.create(this);
     }
-
     @Override
     public NbtCompound toInitialChunkDataNbt() {
         return createNbt();

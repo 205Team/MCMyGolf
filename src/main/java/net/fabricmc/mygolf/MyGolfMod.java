@@ -20,14 +20,14 @@ public class MyGolfMod implements ModInitializer {
 		// However, some things (like resources) may still be uninitialized.
 		// Proceed with mild caution.
 
-		//注册物品
-		RegisterItems.registryItems();
 		//注册方块
 		RegisterBlocks.registryBlocks();
+		//注册方块实体
+		RegisterBlockEntities.registerBlockEntities();
 		//注册实体
 		RegisterEntities.registryEntities();
-
-		new RegisterBlockEntities();
+		//注册物品
+		RegisterItems.registryItems();
 
 		LOGGER.info("Hello Fabric world!");
 	}

@@ -22,7 +22,7 @@
       "net.fabricmc.mygolf.MyGolfMod"
     ],
     "client": [
-      "net.fabricmc.mygolf.EntityTestingClient"
+      "net.fabricmc.mygolf.MyGolfModClient"
     ]
   },
   "mixins": [
