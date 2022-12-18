@@ -1,7 +1,6 @@
 package net.fabricmc.mygolf;
 
 import net.fabricmc.mygolf.blocks.Flagstick;
-import net.fabricmc.mygolf.blocks.GolfBall;
 import net.fabricmc.mygolf.blocks.GolfHole;
 import net.fabricmc.mygolf.blocks.base.BaseBlock;
 import net.fabricmc.mygolf.blocks.base.BaseBlockWithEntity;
@@ -16,7 +15,6 @@ public class RegisterBlocks {
     /**
      * 方块声明
      */
-    public static final GolfBall GOLF_BALL = GolfBall.defaultInstance();    //高尔夫球方块
     public static final Flagstick FLAGSTICK = Flagstick.defaultInstance();    //红旗杆方块
     public static final GolfHole GOLF_HOLE = GolfHole.defaultInstance();    //球洞方块
 
@@ -24,7 +22,6 @@ public class RegisterBlocks {
      * 注册方块
      */
     public static void registryBlocks() {
-        registryBlock(GOLF_BALL);
         registryBlock(FLAGSTICK);
         registryBlock(GOLF_HOLE);
     }

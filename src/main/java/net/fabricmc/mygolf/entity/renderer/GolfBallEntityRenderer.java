@@ -15,6 +15,6 @@ public class GolfBallEntityRenderer extends MobEntityRenderer<GolfBallEntity, Go
     }
 
     public Identifier getTexture(GolfBallEntity entity) {
-        return new Identifier(CommonStr.modId, "textures/entity/cube/golf_ball.png");
+        return new Identifier(CommonStr.modId, "textures/entity/cube/golf_ball_spawn_egg.png");
     }
 }
