@@ -1,7 +1,6 @@
 package net.fabricmc.mygolf;
 
 import net.fabricmc.mygolf.global.CommonStr;
-import net.fabricmc.mygolf.items.GolfBallSpawnEgg;
 import net.fabricmc.mygolf.items.GolfClub;
 import net.fabricmc.mygolf.items.IronStick;
 import net.fabricmc.mygolf.items.base.BaseItem;
@@ -18,14 +17,12 @@ public class RegisterItems {
      */
     public static final GolfClub GOLF_CLUB_TOOL = GolfClub.defaultInstance();       //高尔夫球杆
     public static final IronStick IRON_STICK_ITEM = IronStick.defaultInstance();       //铁棒
-    public static final GolfBallSpawnEgg GOLF_BALL_SPAWN_EGG = GolfBallSpawnEgg.defaultInstance();  //高尔夫球生怪蛋
     /**
      * 注册物品
      */
     public static void registryItems() {
         registryItem(GOLF_CLUB_TOOL,GOLF_CLUB_TOOL.codeName());
         registryItem(IRON_STICK_ITEM);
-        registryItem(GOLF_BALL_SPAWN_EGG,GOLF_BALL_SPAWN_EGG.codeName());
     }
 
     /**

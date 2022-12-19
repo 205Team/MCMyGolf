@@ -14,13 +14,12 @@ public class GolfBallEntityModel extends EntityModel<GolfBallEntity> {
     public GolfBallEntityModel(ModelPart modelPart) {
         this.base = modelPart.getChild(EntityModelPartNames.CUBE);
     }
-
-
+    
     // You can use BlockBench, make your model and export it to get this method for your entity model.
     public static TexturedModelData getTexturedModelData() {
         ModelData modelData = new ModelData();
         ModelPartData modelPartData = modelData.getRoot();
-        modelPartData.addChild(EntityModelPartNames.CUBE, ModelPartBuilder.create().uv(0, 0).cuboid(-6F, 12F, -6F, 12F, 12F, 12F), ModelTransform.pivot(0F, 0F, 0F));
+        modelPartData.addChild(EntityModelPartNames.CUBE, ModelPartBuilder.create().uv(0, 0).cuboid(0, 0, 0, 12F, 12F, 12F), ModelTransform.pivot(0F, 0F, 0F));
         return TexturedModelData.of(modelData, 64, 64);
     }
 

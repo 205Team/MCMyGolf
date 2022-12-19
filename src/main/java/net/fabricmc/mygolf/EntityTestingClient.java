@@ -23,9 +23,7 @@ public class EntityTestingClient implements ClientModInitializer {
          */
 
         // In 1.17, use EntityRendererRegistry.register (seen below) instead of EntityRendererRegistry.INSTANCE.register (seen above)
-        EntityRendererRegistry.register(RegisterEntities.GOLF_BALL, (context) -> {
-            return new GolfBallEntityRenderer(context);
-        });
+        EntityRendererRegistry.register(RegisterEntities.GOLF_BALL, (context) -> new GolfBallEntityRenderer(context));
 
         EntityModelLayerRegistry.registerModelLayer(MODEL_CUBE_LAYER, GolfBallEntityModel::getTexturedModelData);
     }

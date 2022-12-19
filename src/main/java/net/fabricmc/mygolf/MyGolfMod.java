@@ -24,6 +24,7 @@ public class MyGolfMod implements ModInitializer {
 		RegisterBlocks.registryBlocks();
 		//注册实体
 		RegisterEntities.registryEntities();
+
 		LOGGER.info("Hello Fabric world!");
 	}
 
