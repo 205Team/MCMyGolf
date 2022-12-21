@@ -35,10 +35,10 @@ public class BaseEntity extends LivingEntity implements EntityAbstract {
     public boolean isSilent() {
         return true;
     }
-
+    @Override
+    public boolean isAttackable() { return false; }
     @Override
     protected void fall(double d, boolean bl, BlockState blockState, BlockPos blockPos) {}
-
     @Override
     public boolean handleFallDamage(float f, float g, DamageSource damageSource) {
         return false;
@@ -47,16 +47,12 @@ public class BaseEntity extends LivingEntity implements EntityAbstract {
     public Iterable<ItemStack> getArmorItems() {
         return new ArrayList<>();
     }
-
     @Override
     public ItemStack getEquippedStack(EquipmentSlot equipmentSlot) {
         return new ItemStack(Items.AIR);
     }
-
     @Override
     public void equipStack(EquipmentSlot equipmentSlot, ItemStack itemStack) {}
-
-
     @Override
     public Arm getMainArm() {
         return null;

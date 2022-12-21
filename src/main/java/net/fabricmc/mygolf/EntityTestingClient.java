@@ -1,5 +1,6 @@
 package net.fabricmc.mygolf;
 
+import dev.lazurite.rayon.impl.bullet.collision.space.block.BlockProperty;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
