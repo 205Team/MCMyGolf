@@ -1,13 +1,11 @@
 package net.fabricmc.mygolf.entity.base;
 
-import dev.lazurite.rayon.impl.bullet.collision.body.EntityRigidBody;
 import net.fabricmc.mygolf.tools.StringTool;
 import net.minecraft.block.BlockState;
 import net.minecraft.entity.EntityType;
 import net.minecraft.entity.EquipmentSlot;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.damage.DamageSource;
-import net.minecraft.entity.mob.MobEntity;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
 import net.minecraft.util.Arm;
