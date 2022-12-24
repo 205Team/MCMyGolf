@@ -12,7 +12,6 @@ import net.minecraft.world.World;
 import java.util.ArrayList;
 
 public class BaseEntity extends LivingEntity implements EntityAbstract {
-
     protected BaseEntity(EntityType<? extends LivingEntity> entityType, World level) {
         super(entityType, level);
     }
@@ -25,6 +24,7 @@ public class BaseEntity extends LivingEntity implements EntityAbstract {
     public String codeName() {
         return StringTool.getIdFrom(getClass().getSimpleName());
     }
+
 
     @Override
     public Iterable<ItemStack> getArmorItems() {
