@@ -68,10 +68,8 @@ public class GolfBall extends BaseItem {
             }
             //生成高尔夫球实体
             level.spawnEntity(golfBallEntity);
-            user.giveItemStack(new ItemStack(RegisterItems.GOLF_BALL));
-            return TypedActionResult.success(itemStack);
+            itemStack.decrement(1);//数量-1
         }
-
-        return TypedActionResult.pass(itemStack);
+        return TypedActionResult.success(itemStack);
     }
 }

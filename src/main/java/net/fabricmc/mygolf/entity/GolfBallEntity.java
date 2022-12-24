@@ -93,14 +93,14 @@ public class GolfBallEntity extends BaseEntity implements EntityPhysicsElement {
      * 事件注册
      */
     public static void registerEvents() {
-        AttackEntityCallback.EVENT.register(getAttckCallback()); //受击打
+        AttackEntityCallback.EVENT.register(getAttackCallback()); //受击打
         UseEntityCallback.EVENT.register(getUseCallback());
     }
 
     /**
      * 受击打回调
      */
-    private static AttackEntityCallback getAttckCallback() {
+    private static AttackEntityCallback getAttackCallback() {
         return ((player, world, hand, entity, hitResult) -> {
             /* 手动的旁观者检查是必要的，因为 AttackBlockCallbacks 会在旁观者检查之前应用 */
             //敲打高尔夫球 远低近高
@@ -133,10 +133,17 @@ public class GolfBallEntity extends BaseEntity implements EntityPhysicsElement {
     private static UseEntityCallback getUseCallback() {
         return (player, world, hand, entity, hitResult) -> {
             //高尔夫球没被移除时，捡起高尔夫球
-            if (entity instanceof GolfBallEntity && entity.isAlive() && hand == Hand.MAIN_HAND && !player.isSpectator() && player.getMainHandStack().isEmpty() && player.getOffHandStack().isEmpty()) {
-                entity.discard();
-                player.giveItemStack(new ItemStack(RegisterItems.GOLF_BALL));
-                return ActionResult.SUCCESS;
+            if (entity instanceof GolfBallEntity && hand == Hand.MAIN_HAND && !player.isSpectator()) {
+                if (player.getMainHandStack().isEmpty()){
+                    entity.discard();
+                    player.setStackInHand(Hand.MAIN_HAND, new ItemStack(RegisterItems.GOLF_BALL));
+                    return ActionResult.SUCCESS;
+                }
+                if (player.getMainHandStack().isOf(RegisterItems.GOLF_BALL)){
+                    entity.discard();
+                    player.getMainHandStack().increment(1);
+                    return ActionResult.SUCCESS;
+                }
             }
             return ActionResult.PASS;
         };
