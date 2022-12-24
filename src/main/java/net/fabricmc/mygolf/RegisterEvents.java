@@ -12,6 +12,7 @@ import net.minecraft.entity.Entity;
 import net.minecraft.item.ItemStack;
 import net.minecraft.text.Text;
 import net.minecraft.util.ActionResult;
+import net.minecraft.util.Hand;
 import net.minecraft.util.hit.EntityHitResult;
 import net.minecraft.util.hit.HitResult;
 import net.minecraft.util.math.Vec2f;
@@ -53,7 +54,8 @@ public class RegisterEvents {
         UseEntityCallback.EVENT.register((player, world, hand, entity, hitResult) ->
         {
             //高尔夫球没被移除时，捡起高尔夫球
-            if (entity instanceof GolfBallEntity && entity.isAlive() && !player.isSpectator() && player.getMainHandStack().isEmpty()) {
+            if (entity instanceof GolfBallEntity && entity.isAlive() && hand == Hand.MAIN_HAND
+                    && !player.isSpectator() && player.getMainHandStack().isEmpty() && player.getOffHandStack().isEmpty()) {
                 entity.discard();
                 player.giveItemStack(new ItemStack(RegisterItems.GOLF_BALL));
                 return ActionResult.SUCCESS;
