@@ -1,9 +1,7 @@
 package net.fabricmc.mygolf.blocks.base;
 
 import net.fabricmc.mygolf.tools.StringTool;
-import net.minecraft.block.AbstractBlock;
 import net.minecraft.block.Block;
-import net.minecraft.item.Item;
 
 public abstract class BaseBlockWithEntity extends Block implements BlockAbstract{
 

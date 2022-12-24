@@ -1,8 +1,6 @@
 package net.fabricmc.mygolf.entity.model;
 
 import com.google.common.collect.ImmutableList;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
 import net.fabricmc.mygolf.entity.GolfBallEntity;
 import net.minecraft.client.model.*;
 import net.minecraft.client.render.VertexConsumer;

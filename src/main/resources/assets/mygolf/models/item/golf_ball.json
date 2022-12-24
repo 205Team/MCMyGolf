@@ -1,7 +1,7 @@
 {
   "parent": "builtin/generated",
   "textures": {
-    "layer0": "mygolf:item/golf_ball_spawn_egg"
+    "layer0": "mygolf:item/golf_ball"
   },
   "display": {
     "thirdperson_righthand": {

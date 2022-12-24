@@ -50,7 +50,7 @@ public class RegisterEvents {
         {
             //捡起高尔夫球
             if(entity instanceof GolfBallEntity && !player.isSpectator() && player.getMainHandStack().isEmpty()) {
-                player.giveItemStack(new ItemStack(RegisterItems.IRON_STICK_ITEM));
+                player.giveItemStack(new ItemStack(RegisterItems.GOLF_BALL));
                 entity.kill();
             }
             return ActionResult.PASS;

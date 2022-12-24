@@ -46,6 +46,6 @@ public class GolfBallEntityRenderer extends EntityRenderer<GolfBallEntity> {
     }
     @Override
     public Identifier getTexture(GolfBallEntity entity) {
-        return new Identifier(CommonStr.modId, "textures/entity/cube/golf_ball_spawn_egg.png");
+        return new Identifier(CommonStr.modId, "textures/entity/cube/golf_ball.png");
     }
 }

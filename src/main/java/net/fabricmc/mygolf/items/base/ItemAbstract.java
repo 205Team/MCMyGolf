@@ -1,7 +1,5 @@
 package net.fabricmc.mygolf.items.base;
 
-import net.minecraft.item.Item;
-
 public interface ItemAbstract {
     /**
      * 代号
