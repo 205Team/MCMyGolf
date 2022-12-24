@@ -2,15 +2,21 @@ package net.fabricmc.mygolf;
 
 import com.jme3.math.Vector3f;
 import dev.lazurite.rayon.impl.bullet.thread.PhysicsThread;
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.event.player.AttackEntityCallback;
 import net.fabricmc.fabric.api.event.player.UseEntityCallback;
 import net.fabricmc.mygolf.entity.GolfBallEntity;
+import net.minecraft.entity.Entity;
 import net.minecraft.item.ItemStack;
+import net.minecraft.text.Text;
 import net.minecraft.util.ActionResult;
+import net.minecraft.util.hit.EntityHitResult;
+import net.minecraft.util.hit.HitResult;
 import net.minecraft.util.math.Vec2f;
 import net.minecraft.util.math.Vec3d;
 
 public class RegisterEvents {
+    public static boolean isPrevLookBall = false;
     public static void registerEvents() {
 
         //事件：左击实体
@@ -48,6 +54,30 @@ public class RegisterEvents {
                 entity.kill();
             }
             return ActionResult.PASS;
+        });
+
+        /*
+        client events
+         */
+        //每tick结束时运行
+        ClientTickEvents.END_CLIENT_TICK.register(client ->
+        {
+            //视线投射击中对象
+            HitResult hit = client.crosshairTarget;
+            //玩家是否看向实体
+            if (hit != null && hit.getType() == HitResult.Type.ENTITY) {
+                EntityHitResult entityHit = (EntityHitResult) hit;
+                Entity entity = entityHit.getEntity();
+                //玩家是否看向高尔夫球
+                if (entity instanceof GolfBallEntity) {
+                    //渲染箭头
+                    if (!isPrevLookBall) {client.player.sendMessage(Text.of("look at ball"), true);}
+                    isPrevLookBall = true;
+                    return;
+                }
+            }
+            if (isPrevLookBall) {client.player.sendMessage(Text.of("look away ball"), true);}
+            isPrevLookBall = false;
         });
     }
 }

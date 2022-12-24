@@ -16,13 +16,13 @@ public class RegisterEntities {
         GOLF_BALL = Registry.register(
             Registry.ENTITY_TYPE,
             new Identifier(CommonStr.modId, "golf_ball_entity"),
-                FabricEntityTypeBuilder.createLiving()
-                        .entityFactory(GolfBallEntity::new)
-                        .spawnGroup(SpawnGroup.MISC)
-                        .defaultAttributes(LivingEntity::createLivingAttributes)
-                        .dimensions(EntityDimensions.fixed(0.75f, 0.75f))
-                        .trackRangeBlocks(80)
-                        .build());
+            FabricEntityTypeBuilder.createLiving()
+                    .entityFactory(GolfBallEntity::new)
+                    .spawnGroup(SpawnGroup.MISC)
+                    .defaultAttributes(LivingEntity::createLivingAttributes)
+                    .dimensions(EntityDimensions.fixed(0.75f, 0.75f))
+                    .trackRangeBlocks(80)
+                    .build());
     }
 
     private static void registryEntity() {

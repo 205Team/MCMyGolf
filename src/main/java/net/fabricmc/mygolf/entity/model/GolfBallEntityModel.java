@@ -1,6 +1,8 @@
 package net.fabricmc.mygolf.entity.model;
 
 import com.google.common.collect.ImmutableList;
+import net.fabricmc.api.EnvType;
+import net.fabricmc.api.Environment;
 import net.fabricmc.mygolf.entity.GolfBallEntity;
 import net.minecraft.client.model.*;
 import net.minecraft.client.render.VertexConsumer;
@@ -22,7 +24,6 @@ public class GolfBallEntityModel extends EntityModel<GolfBallEntity> {
         modelPartData.addChild(EntityModelPartNames.CUBE, ModelPartBuilder.create().uv(0, 0).cuboid(0, 0, 0, 12F, 12F, 12F), ModelTransform.pivot(0F, 0F, 0F));
         return TexturedModelData.of(modelData, 64, 64);
     }
-
 
     @Override
     public void setAngles(GolfBallEntity entity, float limbAngle, float limbDistance, float animationProgress, float headYaw, float headPitch) {

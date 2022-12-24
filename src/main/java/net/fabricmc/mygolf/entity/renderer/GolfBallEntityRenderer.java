@@ -2,6 +2,8 @@ package net.fabricmc.mygolf.entity.renderer;
 
 import com.jme3.math.Quaternion;
 import dev.lazurite.rayon.impl.bullet.math.Convert;
+import net.fabricmc.api.EnvType;
+import net.fabricmc.api.Environment;
 import net.fabricmc.mygolf.EntityTestingClient;
 import net.fabricmc.mygolf.entity.GolfBallEntity;
 import net.fabricmc.mygolf.entity.model.GolfBallEntityModel;
@@ -14,12 +16,13 @@ import net.minecraft.client.render.entity.EntityRendererFactory;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.util.Identifier;
 
+@Environment(EnvType.CLIENT)
 public class GolfBallEntityRenderer extends EntityRenderer<GolfBallEntity> {
     private final GolfBallEntityModel model;
     public GolfBallEntityRenderer(EntityRendererFactory.Context context) {
         super(context);
         this.model = new GolfBallEntityModel(context.getPart(EntityTestingClient.MODEL_CUBE_LAYER));
-        this.shadowRadius = 0.75f;
+        this.shadowRadius = 0.5f;
     }
 
     public void render(GolfBallEntity ballEntity, float yaw, float delta, MatrixStack matrixStack, VertexConsumerProvider multiBufferSource, int i) {

@@ -1,15 +1,12 @@
 package net.fabricmc.mygolf.entity.base;
 
 import net.fabricmc.mygolf.tools.StringTool;
-import net.minecraft.block.BlockState;
 import net.minecraft.entity.EntityType;
 import net.minecraft.entity.EquipmentSlot;
 import net.minecraft.entity.LivingEntity;
-import net.minecraft.entity.damage.DamageSource;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
 import net.minecraft.util.Arm;
-import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
 
 import java.util.ArrayList;
@@ -29,18 +26,6 @@ public class BaseEntity extends LivingEntity implements EntityAbstract {
         return StringTool.getIdFrom(getClass().getSimpleName());
     }
 
-    @Override
-    public boolean isSilent() {
-        return true;
-    }
-    @Override
-    public boolean isAttackable() { return false; }
-    @Override
-    protected void fall(double d, boolean bl, BlockState blockState, BlockPos blockPos) {}
-    @Override
-    public boolean handleFallDamage(float f, float g, DamageSource damageSource) {
-        return false;
-    }
     @Override
     public Iterable<ItemStack> getArmorItems() {
         return new ArrayList<>();
