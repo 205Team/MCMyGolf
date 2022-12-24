@@ -6,13 +6,19 @@ import net.fabricmc.mygolf.RegisterEntities;
 import net.fabricmc.mygolf.RegisterItems;
 import net.fabricmc.mygolf.entity.GolfBallEntity;
 import net.fabricmc.mygolf.items.base.BaseItem;
+import net.minecraft.client.item.TooltipContext;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.ItemGroup;
 import net.minecraft.item.ItemStack;
+import net.minecraft.text.Text;
+import net.minecraft.util.Formatting;
 import net.minecraft.util.Hand;
 import net.minecraft.util.TypedActionResult;
 import net.minecraft.world.RaycastContext;
 import net.minecraft.world.World;
+import org.jetbrains.annotations.Nullable;
+
+import java.util.List;
 
 ///item:高尔夫球
 public class GolfBall extends BaseItem {
@@ -31,6 +37,15 @@ public class GolfBall extends BaseItem {
     //默认设置
     private static Settings defaultSetting() {
         return new Settings().maxCount(maxCount).group(ItemGroup.MISC);
+    }
+
+
+    ///添加物品提示
+    @Override
+    public void appendTooltip(ItemStack stack, @Nullable World world, List<Text> tooltip, TooltipContext context) {
+        super.appendTooltip(stack, world, tooltip, context);
+        // 默认为白色文本
+        tooltip.add(Text.translatable("空手右键可回收").formatted(Formatting.GRAY));
     }
 
     //右键生成golf ball测试
