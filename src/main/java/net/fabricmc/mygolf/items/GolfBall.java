@@ -39,7 +39,6 @@ public class GolfBall extends BaseItem {
         return new Settings().maxCount(maxCount).group(ItemGroup.MISC);
     }
 
-
     ///添加物品提示
     @Override
     public void appendTooltip(ItemStack stack, @Nullable World world, List<Text> tooltip, TooltipContext context) {

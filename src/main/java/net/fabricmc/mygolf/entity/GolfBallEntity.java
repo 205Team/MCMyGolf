@@ -134,15 +134,23 @@ public class GolfBallEntity extends BaseEntity implements EntityPhysicsElement {
         return (player, world, hand, entity, hitResult) -> {
             //高尔夫球没被移除时，捡起高尔夫球
             if (entity instanceof GolfBallEntity && hand == Hand.MAIN_HAND && !player.isSpectator()) {
-                if (player.getMainHandStack().isEmpty()){
+                ItemStack mainHandStack = player.getMainHandStack();
+                if (mainHandStack.isEmpty()){
                     entity.discard();
                     player.setStackInHand(Hand.MAIN_HAND, new ItemStack(RegisterItems.GOLF_BALL));
                     return ActionResult.SUCCESS;
                 }
-                if (player.getMainHandStack().isOf(RegisterItems.GOLF_BALL)){
-                    entity.discard();
-                    player.getMainHandStack().increment(1);
-                    return ActionResult.SUCCESS;
+                if (mainHandStack.isOf(RegisterItems.GOLF_BALL)){
+                    if(mainHandStack.getCount() < RegisterItems.GOLF_BALL.getMaxCount()){
+                        entity.discard();
+                        mainHandStack.increment(1);
+                        return ActionResult.SUCCESS;
+                    }
+                    else {
+                        entity.discard();
+                        player.giveItemStack(new ItemStack(RegisterItems.GOLF_BALL));
+                        return ActionResult.SUCCESS;
+                    }
                 }
             }
             return ActionResult.PASS;
