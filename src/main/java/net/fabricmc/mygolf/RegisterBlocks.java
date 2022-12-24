@@ -30,7 +30,7 @@ public class RegisterBlocks {
      * 注册新BaseBlock
      * @param block 物品
      */
-    public static void registryBlock(BaseBlock block) {
+    private static void registryBlock(BaseBlock block) {
         registryBlock(block, block.codeName(), block.itemDefaultSetting());
     }
 
@@ -39,7 +39,7 @@ public class RegisterBlocks {
      * 注册新BaseBlockWithEntity
      * @param block 物品
      */
-    public static void registryBlockWithEntity(BaseBlockWithEntity block) {
+    private static void registryBlockWithEntity(BaseBlockWithEntity block) {
         registryBlock(block, block.codeName(), block.itemDefaultSetting());
     }
 
@@ -49,7 +49,7 @@ public class RegisterBlocks {
      * @param codeName 代号
      * @param settings BlockItem的设置
      */
-    public static void registryBlock(Block block, String codeName, Item.Settings settings) {
+    private static void registryBlock(Block block, String codeName, Item.Settings settings) {
         Registry.register(Registry.BLOCK, new Identifier(CommonStr.modId, codeName), block);
         Registry.register(Registry.ITEM, new Identifier(CommonStr.modId, codeName), new BlockItem(block, settings));
     }

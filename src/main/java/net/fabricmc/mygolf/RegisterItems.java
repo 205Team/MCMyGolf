@@ -32,7 +32,7 @@ public class RegisterItems {
      * 注册新BaseItem
      * @param item 物品
      */
-    public static void registryItem(BaseItem item) {
+    private static void registryItem(BaseItem item) {
         registryItem(item, item.codeName());
     }
 
@@ -42,7 +42,7 @@ public class RegisterItems {
      * @param item 物品
      * @param codeName 代号
      */
-    public static void registryItem(Item item, String codeName) {
+    private static void registryItem(Item item, String codeName) {
         Registry.register(Registry.ITEM, new Identifier(CommonStr.modId, codeName), item);
     }
 

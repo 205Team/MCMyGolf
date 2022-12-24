@@ -6,21 +6,27 @@ import dev.lazurite.rayon.impl.bullet.collision.body.EntityRigidBody;
 import dev.lazurite.rayon.impl.bullet.thread.PhysicsThread;
 import net.fabricmc.fabric.api.event.player.AttackEntityCallback;
 import net.fabricmc.fabric.api.event.player.UseEntityCallback;
+import net.fabricmc.fabric.api.object.builder.v1.entity.FabricEntityTypeBuilder;
 import net.fabricmc.mygolf.MyGolfMod;
 import net.fabricmc.mygolf.RegisterItems;
 import net.fabricmc.mygolf.entity.base.BaseEntity;
+import net.fabricmc.mygolf.global.CommonStr;
 import net.fabricmc.mygolf.items.GolfClub;
 import net.minecraft.block.BlockState;
+import net.minecraft.entity.EntityDimensions;
 import net.minecraft.entity.EntityType;
 import net.minecraft.entity.LivingEntity;
+import net.minecraft.entity.SpawnGroup;
 import net.minecraft.entity.damage.DamageSource;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.ActionResult;
 import net.minecraft.util.Hand;
+import net.minecraft.util.Identifier;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec2f;
 import net.minecraft.util.math.Vec3d;
+import net.minecraft.util.registry.Registry;
 import net.minecraft.world.World;
 
 public class GolfBallEntity extends BaseEntity implements EntityPhysicsElement {
@@ -68,6 +74,22 @@ public class GolfBallEntity extends BaseEntity implements EntityPhysicsElement {
     }
 
     /**
+     * 注册EntityType
+     */
+    public static EntityType<GolfBallEntity> register() {
+        return Registry.register(
+                Registry.ENTITY_TYPE,
+                new Identifier(CommonStr.modId, "golf_ball_entity"),
+                FabricEntityTypeBuilder.createLiving()
+                        .entityFactory(GolfBallEntity::new)
+                        .spawnGroup(SpawnGroup.MISC)
+                        .defaultAttributes(LivingEntity::createLivingAttributes)
+                        .dimensions(EntityDimensions.fixed(0.75f, 0.75f))
+                        .trackRangeBlocks(80)
+                        .build());
+    }
+
+    /**
      * 事件注册
      */
     public static void registerEvents() {
@@ -78,7 +100,7 @@ public class GolfBallEntity extends BaseEntity implements EntityPhysicsElement {
     /**
      * 受击打回调
      */
-    public static AttackEntityCallback getAttckCallback() {
+    private static AttackEntityCallback getAttckCallback() {
         return ((player, world, hand, entity, hitResult) -> {
             /* 手动的旁观者检查是必要的，因为 AttackBlockCallbacks 会在旁观者检查之前应用 */
             //敲打高尔夫球 远低近高
@@ -108,7 +130,7 @@ public class GolfBallEntity extends BaseEntity implements EntityPhysicsElement {
     /**
      * 使用回调
      */
-    public static UseEntityCallback getUseCallback() {
+    private static UseEntityCallback getUseCallback() {
         return (player, world, hand, entity, hitResult) -> {
             //高尔夫球没被移除时，捡起高尔夫球
             if (entity instanceof GolfBallEntity && entity.isAlive() && hand == Hand.MAIN_HAND && !player.isSpectator() && player.getMainHandStack().isEmpty() && player.getOffHandStack().isEmpty()) {
