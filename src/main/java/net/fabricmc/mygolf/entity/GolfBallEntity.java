@@ -3,6 +3,7 @@ package net.fabricmc.mygolf.entity;
 import com.jme3.math.Vector3f;
 import dev.lazurite.rayon.api.EntityPhysicsElement;
 import dev.lazurite.rayon.impl.bullet.collision.body.EntityRigidBody;
+import dev.lazurite.rayon.impl.bullet.collision.body.shape.MinecraftShape;
 import dev.lazurite.rayon.impl.bullet.thread.PhysicsThread;
 import net.fabricmc.fabric.api.event.player.AttackEntityCallback;
 import net.fabricmc.fabric.api.event.player.UseEntityCallback;
@@ -13,10 +14,7 @@ import net.fabricmc.mygolf.entity.base.BaseEntity;
 import net.fabricmc.mygolf.global.CommonStr;
 import net.fabricmc.mygolf.items.GolfClub;
 import net.minecraft.block.BlockState;
-import net.minecraft.entity.EntityDimensions;
-import net.minecraft.entity.EntityType;
-import net.minecraft.entity.LivingEntity;
-import net.minecraft.entity.SpawnGroup;
+import net.minecraft.entity.*;
 import net.minecraft.entity.damage.DamageSource;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.ItemStack;
@@ -33,15 +31,22 @@ public class GolfBallEntity extends BaseEntity implements EntityPhysicsElement {
     private final EntityRigidBody rigidBody = new EntityRigidBody(this);
     ///被击打次数
     private int hitTimes = 0;
+    private float rigidBodyMass = 0.457f;
 
     public GolfBallEntity(EntityType<? extends LivingEntity> entityType, World level) {
         super(entityType, level);
-        this.rigidBody.setMass(0.457f);
+        this.rigidBody.setMass(rigidBodyMass);
     }
 
     @Override
     public EntityRigidBody getRigidBody() {
         return this.rigidBody;
+    }
+
+    @Override
+    public void setPosition(double x, double y, double z) {
+        this.setPos(x, y, z);
+        this.setBoundingBox(this.calculateBoundingBox().offset(0f,-this.getBoundingBox().getYLength() / 2, 0f)); //碰撞箱偏移
     }
 
     @Override

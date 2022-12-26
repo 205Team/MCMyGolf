@@ -14,6 +14,7 @@ import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 import net.minecraft.util.Hand;
 import net.minecraft.util.TypedActionResult;
+import net.minecraft.util.math.Box;
 import net.minecraft.world.RaycastContext;
 import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
@@ -67,6 +68,7 @@ public class GolfBall extends BaseItem {
             }
             //生成高尔夫球实体
             level.spawnEntity(golfBallEntity);
+
             itemStack.decrement(1);//数量-1
         }
         return TypedActionResult.success(itemStack);

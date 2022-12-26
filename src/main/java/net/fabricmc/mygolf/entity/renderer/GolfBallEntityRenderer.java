@@ -31,7 +31,7 @@ public class GolfBallEntityRenderer extends EntityRenderer<GolfBallEntity> {
 
         matrixStack.push();
         matrixStack.multiply(rot);
-        matrixStack.translate(box.getXLength() * -0.5, box.getYLength() * -0.5, box.getZLength() * -0.5);
+        //matrixStack.translate(box.getXLength() * -0.5, box.getYLength() * -0.5, box.getZLength() * -0.5);
 
         final var vertexConsumer = multiBufferSource.getBuffer(model.getLayer(this.getTexture(ballEntity)));
         model.render(matrixStack, vertexConsumer, i, OverlayTexture.DEFAULT_UV, 1.0F, 1.0F, 1.0F, 1.0F);
