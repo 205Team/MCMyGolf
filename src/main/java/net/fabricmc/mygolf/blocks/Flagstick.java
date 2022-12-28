@@ -4,12 +4,15 @@ import net.fabricmc.mygolf.RegisterBlocks;
 import net.fabricmc.mygolf.blockEntity.FlagstickEntity;
 import net.fabricmc.mygolf.blocks.base.BaseBlockWithEntity;
 import net.minecraft.block.*;
+import net.minecraft.block.entity.AbstractFurnaceBlockEntity;
 import net.minecraft.block.entity.BlockEntity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.inventory.Inventory;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemGroup;
 import net.minecraft.item.ItemPlacementContext;
+import net.minecraft.item.ItemStack;
+import net.minecraft.server.world.ServerWorld;
 import net.minecraft.state.StateManager;
 import net.minecraft.state.property.IntProperty;
 import net.minecraft.state.property.Properties;
@@ -18,20 +21,22 @@ import net.minecraft.util.*;
 import net.minecraft.util.hit.BlockHitResult;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.MathHelper;
+import net.minecraft.util.math.Vec3d;
 import net.minecraft.util.shape.VoxelShape;
 import net.minecraft.util.shape.VoxelShapes;
 import net.minecraft.world.BlockView;
 import net.minecraft.world.World;
+import net.minecraft.world.WorldAccess;
 import org.jetbrains.annotations.Nullable;
 
 public class Flagstick extends BaseBlockWithEntity implements BlockEntityProvider {
     static int maxCount = 1;    //最大堆叠数量
-    private boolean isWithHole = false;
+    private static boolean isWithHole = false;
     public static final IntProperty ROTATION;
     protected static final VoxelShape SHAPE;
     static {
         ROTATION = Properties.ROTATION;
-        SHAPE = VoxelShapes.cuboid(0.4375f, 0, 0.4375f, 0.5625f, 1f, 0.5625f);
+        SHAPE = VoxelShapes.cuboid(0.375F, 0, 0.375F, 0.625F, 1f, 0.625F);
     }
 
     public Flagstick(Settings settings) {
@@ -88,11 +93,19 @@ public class Flagstick extends BaseBlockWithEntity implements BlockEntityProvide
     @Override
     public void onStateReplaced(BlockState state, World world, BlockPos pos, BlockState newState, boolean moved) {
         if (!state.isOf(newState.getBlock())) {
-            if (isWithHole && world.getBlockState(pos.down()) == RegisterBlocks.GOLF_HOLE.getDefaultState()) {
-                world.setBlockState(pos.down(), Blocks.GRASS_BLOCK.getDefaultState());
-
+            BlockEntity blockEntity = world.getBlockEntity(pos);
+            if (blockEntity instanceof FlagstickEntity) {
+                if (world instanceof ServerWorld) {
+                    BlockPos downBlockPos = pos.down();
+                    Block downBlock = world.getBlockState(downBlockPos).getBlock();
+                    if(downBlock == RegisterBlocks.GOLF_HOLE && isWithHole){
+                        world.setBlockState(downBlockPos, Blocks.GRASS_BLOCK.getDefaultState());
+                    }
+                    this.dropStack(world, pos, new ItemStack(RegisterBlocks.FLAGSTICK));
+                }
+                world.updateComparators(pos, this);
             }
-
+            super.onStateReplaced(state, world, pos, newState, moved);
         }
     }
 
