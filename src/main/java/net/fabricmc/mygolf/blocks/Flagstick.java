@@ -4,10 +4,9 @@ import net.fabricmc.mygolf.RegisterBlocks;
 import net.fabricmc.mygolf.blockEntity.FlagstickEntity;
 import net.fabricmc.mygolf.blocks.base.BaseBlockWithEntity;
 import net.minecraft.block.*;
-import net.minecraft.block.entity.AbstractFurnaceBlockEntity;
 import net.minecraft.block.entity.BlockEntity;
+import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.inventory.Inventory;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemGroup;
 import net.minecraft.item.ItemPlacementContext;
@@ -16,22 +15,21 @@ import net.minecraft.server.world.ServerWorld;
 import net.minecraft.state.StateManager;
 import net.minecraft.state.property.IntProperty;
 import net.minecraft.state.property.Properties;
+import net.minecraft.tag.BlockTags;
 import net.minecraft.text.Text;
 import net.minecraft.util.*;
 import net.minecraft.util.hit.BlockHitResult;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.MathHelper;
-import net.minecraft.util.math.Vec3d;
 import net.minecraft.util.shape.VoxelShape;
 import net.minecraft.util.shape.VoxelShapes;
 import net.minecraft.world.BlockView;
 import net.minecraft.world.World;
-import net.minecraft.world.WorldAccess;
+import net.minecraft.world.WorldView;
 import org.jetbrains.annotations.Nullable;
 
 public class Flagstick extends BaseBlockWithEntity implements BlockEntityProvider {
     static int maxCount = 1;    //最大堆叠数量
-    private static boolean isWithHole = false;
     public static final IntProperty ROTATION;
     protected static final VoxelShape SHAPE;
     static {
@@ -74,20 +72,9 @@ public class Flagstick extends BaseBlockWithEntity implements BlockEntityProvide
         return ActionResult.SUCCESS;
     }
 
-    /**
-     * 红旗杆方块被添加到世界时
-     *
-    */
     @Override
-    public void onBlockAdded(BlockState state, World world, BlockPos pos, BlockState oldState, boolean notify){
-        //检查下方一个方块是不是草/泥方块，是就在下面挖洞
-        BlockPos downBlockPos = pos.down();
-        Block downBlock = world.getBlockState(downBlockPos).getBlock();
-        BlockState golfHoleState = RegisterBlocks.GOLF_HOLE.getDefaultState();
-        if(downBlock == Blocks.GRASS_BLOCK || downBlock == Blocks.DIRT){
-            world.setBlockState(downBlockPos, golfHoleState);
-            isWithHole = true;
-        }
+    public void onPlaced(World world, BlockPos pos, BlockState state, LivingEntity placer, ItemStack itemStack){
+        world.setBlockState(pos.down(), RegisterBlocks.GOLF_HOLE.getDefaultState());
     }
 
     @Override
@@ -97,9 +84,9 @@ public class Flagstick extends BaseBlockWithEntity implements BlockEntityProvide
             if (blockEntity instanceof FlagstickEntity) {
                 if (world instanceof ServerWorld) {
                     BlockPos downBlockPos = pos.down();
-                    Block downBlock = world.getBlockState(downBlockPos).getBlock();
-                    if(downBlock == RegisterBlocks.GOLF_HOLE && isWithHole){
-                        world.setBlockState(downBlockPos, Blocks.GRASS_BLOCK.getDefaultState());
+                    BlockState downBlockState = world.getBlockState(downBlockPos);
+                    if(downBlockState.isOf(RegisterBlocks.GOLF_HOLE)){
+                        world.breakBlock(downBlockPos, false);
                     }
                     this.dropStack(world, pos, new ItemStack(RegisterBlocks.FLAGSTICK));
                 }
@@ -109,6 +96,12 @@ public class Flagstick extends BaseBlockWithEntity implements BlockEntityProvide
         }
     }
 
+    @Override
+    public boolean canPlaceAt(BlockState state, WorldView world, BlockPos pos) {
+        BlockPos downBlockPos = pos.down();
+        BlockState downBlockState = world.getBlockState(downBlockPos);
+        return downBlockState.isIn(BlockTags.DIRT) || downBlockState.isOf(Blocks.FARMLAND);
+    }
     @Override
     public BlockState getPlacementState(ItemPlacementContext ctx) {
         return this.getDefaultState().with(ROTATION, MathHelper.floor((double)(ctx.getPlayerYaw() * 16.0F / 360.0F) + 0.5) & 15);

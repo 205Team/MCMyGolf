@@ -22,7 +22,7 @@ import net.minecraft.util.math.Vec3f;
 
 @Environment(EnvType.CLIENT)
 public class FlagstickEntityRenderer implements BlockEntityRenderer<FlagstickEntity> {
-    private static final Identifier textureID = new Identifier("mygolf:textures/block/flagstick.png");
+    private static final Identifier textureID = new Identifier(CommonStr.modId, "textures/block/flagstick.png");
     public final ModelPart ironStick;
     public final ModelPart flag;
     public FlagstickEntityRenderer(BlockEntityRendererFactory.Context ctx) {
