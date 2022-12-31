@@ -34,12 +34,11 @@ public class RegisterBlocks {
         registryBlock(block, block.codeName(), block.itemDefaultSetting());
     }
 
-
     /**
      * 注册新BaseBlockWithEntity
      * @param block 物品
      */
-    private static void registryBlockWithEntity(BaseBlockWithEntity block) {
+    public static void registryBlock(BaseBlockWithEntity block) {
         registryBlock(block, block.codeName(), block.itemDefaultSetting());
     }
 
