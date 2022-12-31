@@ -4,7 +4,7 @@ import com.jme3.math.Quaternion;
 import dev.lazurite.rayon.impl.bullet.math.Convert;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
-import net.fabricmc.mygolf.EntityTestingClient;
+import net.fabricmc.mygolf.MyGolfModClient;
 import net.fabricmc.mygolf.entity.GolfBallEntity;
 import net.fabricmc.mygolf.entity.model.GolfBallEntityModel;
 import net.fabricmc.mygolf.global.CommonStr;
@@ -21,7 +21,7 @@ public class GolfBallEntityRenderer extends EntityRenderer<GolfBallEntity> {
     private final GolfBallEntityModel model;
     public GolfBallEntityRenderer(EntityRendererFactory.Context context) {
         super(context);
-        this.model = new GolfBallEntityModel(context.getPart(EntityTestingClient.MODEL_CUBE_LAYER));
+        this.model = new GolfBallEntityModel(context.getPart(MyGolfModClient.MODEL_CUBE_LAYER));
         this.shadowRadius = 0.5f;
     }
 

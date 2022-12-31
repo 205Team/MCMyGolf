@@ -46,7 +46,7 @@ public class GolfBallEntity extends BaseEntity implements EntityPhysicsElement {
     @Override
     public void setPosition(double x, double y, double z) {
         this.setPos(x, y, z);
-        this.setBoundingBox(this.calculateBoundingBox().offset(0f,-this.getBoundingBox().getYLength() / 2, 0f)); //碰撞箱偏移
+        this.setBoundingBox(this.calculateBoundingBox().offset(0D,-this.getBoundingBox().getYLength() / 2, 0D)); //碰撞箱偏移
     }
 
     @Override
