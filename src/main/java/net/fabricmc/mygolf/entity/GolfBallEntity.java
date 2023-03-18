@@ -18,6 +18,8 @@ import net.minecraft.entity.*;
 import net.minecraft.entity.damage.DamageSource;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.ItemStack;
+import net.minecraft.registry.Registries;
+import net.minecraft.registry.Registry;
 import net.minecraft.text.Text;
 import net.minecraft.util.ActionResult;
 import net.minecraft.util.Hand;
@@ -25,7 +27,6 @@ import net.minecraft.util.Identifier;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec2f;
 import net.minecraft.util.math.Vec3d;
-import net.minecraft.util.registry.Registry;
 import net.minecraft.world.World;
 
 public class GolfBallEntity extends BaseEntity implements EntityPhysicsElement {
@@ -86,7 +87,7 @@ public class GolfBallEntity extends BaseEntity implements EntityPhysicsElement {
      */
     public static EntityType<GolfBallEntity> register() {
         return Registry.register(
-                Registry.ENTITY_TYPE,
+                Registries.ENTITY_TYPE,
                 new Identifier(CommonStr.modId, "golf_ball_entity"),
                 FabricEntityTypeBuilder.createLiving()
                         .entityFactory(GolfBallEntity::new)

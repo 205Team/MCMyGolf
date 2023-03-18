@@ -8,8 +8,9 @@ import net.fabricmc.mygolf.global.CommonStr;
 import net.minecraft.block.Block;
 import net.minecraft.item.BlockItem;
 import net.minecraft.item.Item;
+import net.minecraft.registry.Registries;
+import net.minecraft.registry.Registry;
 import net.minecraft.util.Identifier;
-import net.minecraft.util.registry.Registry;
 
 public class RegisterBlocks {
     /**
@@ -49,7 +50,7 @@ public class RegisterBlocks {
      * @param settings BlockItem的设置
      */
     private static void registryBlock(Block block, String codeName, Item.Settings settings) {
-        Registry.register(Registry.BLOCK, new Identifier(CommonStr.modId, codeName), block);
-        Registry.register(Registry.ITEM, new Identifier(CommonStr.modId, codeName), new BlockItem(block, settings));
+        Registry.register(Registries.BLOCK, new Identifier(CommonStr.modId, codeName), block);
+        Registry.register(Registries.ITEM, new Identifier(CommonStr.modId, codeName), new BlockItem(block, settings));
     }
 }

@@ -3,6 +3,7 @@ package net.fabricmc.mygolf.items;
 import net.fabricmc.mygolf.items.base.ItemAbstract;
 import net.fabricmc.mygolf.tools.StringTool;
 import net.minecraft.item.ItemGroup;
+import net.minecraft.item.ItemGroups;
 import net.minecraft.item.SwordItem;
 import net.minecraft.item.ToolMaterial;
 //item：高尔夫球杆
@@ -23,7 +24,7 @@ public class GolfClub extends SwordItem implements ItemAbstract {
 
     //默认设置
     private static Settings defaultSetting() {
-        return new Settings().group(ItemGroup.COMBAT);
+        return new Settings();
     }
 
     @Override

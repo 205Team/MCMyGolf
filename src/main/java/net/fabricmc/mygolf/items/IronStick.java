@@ -19,7 +19,7 @@ import net.minecraft.item.ItemGroup;
 
     //默认设置
     private static Settings defaultSetting() {
-        return new Settings().maxCount(maxCount).group(ItemGroup.MISC);
+        return new Settings().maxCount(maxCount);
     }
 
 }

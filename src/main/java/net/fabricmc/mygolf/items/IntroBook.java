@@ -24,7 +24,7 @@ public class IntroBook extends BaseItem {
 
     //默认设置
     private static Settings defaultSetting() {
-        return new Settings().maxCount(1).group(ItemGroup.MISC);
+        return new Settings().maxCount(1);
     }
 
     @Override

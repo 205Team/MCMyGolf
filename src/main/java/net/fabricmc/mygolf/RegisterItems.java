@@ -7,8 +7,9 @@ import net.fabricmc.mygolf.items.IntroBook;
 import net.fabricmc.mygolf.items.IronStick;
 import net.fabricmc.mygolf.items.base.BaseItem;
 import net.minecraft.item.Item;
+import net.minecraft.registry.Registries;
+import net.minecraft.registry.Registry;
 import net.minecraft.util.Identifier;
-import net.minecraft.util.registry.Registry;
 
 /**
  * 注册物品类
@@ -46,7 +47,7 @@ public class RegisterItems {
      * @param codeName 代号
      */
     private static void registryItem(Item item, String codeName) {
-        Registry.register(Registry.ITEM, new Identifier(CommonStr.modId, codeName), item);
+        Registry.register(Registries.ITEM, new Identifier(CommonStr.modId, codeName), item);
     }
 
 }

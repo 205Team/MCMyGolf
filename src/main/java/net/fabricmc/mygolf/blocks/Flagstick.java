@@ -11,11 +11,11 @@ import net.minecraft.item.Item;
 import net.minecraft.item.ItemGroup;
 import net.minecraft.item.ItemPlacementContext;
 import net.minecraft.item.ItemStack;
+import net.minecraft.registry.tag.BlockTags;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.state.StateManager;
 import net.minecraft.state.property.IntProperty;
 import net.minecraft.state.property.Properties;
-import net.minecraft.tag.BlockTags;
 import net.minecraft.text.Text;
 import net.minecraft.util.*;
 import net.minecraft.util.hit.BlockHitResult;
@@ -50,7 +50,7 @@ public class Flagstick extends BaseBlockWithEntity implements BlockEntityProvide
     private static AbstractBlock.Settings defaultSetting() {    return Settings.of(Material.STONE);}
 
     public Item.Settings itemDefaultSetting() {
-        return new Item.Settings().maxCount(maxCount).group(ItemGroup.MISC);
+        return new Item.Settings().maxCount(maxCount);
     }
 
     @Override

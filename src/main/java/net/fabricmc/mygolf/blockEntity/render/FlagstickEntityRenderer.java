@@ -18,7 +18,7 @@ import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.MathHelper;
-import net.minecraft.util.math.Vec3f;
+import net.minecraft.util.math.RotationAxis;
 
 @Environment(EnvType.CLIENT)
 public class FlagstickEntityRenderer implements BlockEntityRenderer<FlagstickEntity> {
@@ -39,7 +39,7 @@ public class FlagstickEntityRenderer implements BlockEntityRenderer<FlagstickEnt
         matrices.push();
         matrices.translate(0.5, 0.0, 0.5);
         float rotation = -((float) (blockState.get(Flagstick.ROTATION) * 360) / 16.0F);
-        matrices.multiply(Vec3f.POSITIVE_Y.getDegreesQuaternion(rotation));
+        matrices.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(rotation));
         this.ironStick.render(matrices, vertexConsumer, light, overlay);
 
         long time = flagstickEntity.getWorld().getTime();

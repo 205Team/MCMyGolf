@@ -1,6 +1,7 @@
 package net.fabricmc.mygolf;
 
 import net.fabricmc.mygolf.entity.GolfBallEntity;
+import net.fabricmc.mygolf.events.client.ItemGroupClassifyingEvents;
 import net.fabricmc.mygolf.events.client.MyClientTickEvents;
 
 public class RegisterEvents {
@@ -14,6 +15,9 @@ public class RegisterEvents {
 
         //注册tick事件
         registerTickEvent();
+
+        //注册物品类事件
+        ItemGroupClassifyingEvents.registerEvents();
 
     }
 
