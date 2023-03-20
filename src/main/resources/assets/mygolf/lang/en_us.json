@@ -1,0 +1,10 @@
+{
+  "block.mygolf.golf_ball": "Golf Ball",
+  "block.mygolf.flagstick": "Flagstick",
+  "block.mygolf.golf_hole": "Golf Hole",
+  "item.mygolf.golf_club": "Golf Club",
+  "item.mygolf.iron_stick": "Iron Stick",
+  "item.mygolf.golf_ball": "Golf Ball",
+  "item.mygolf.intro_book": "Intro Book",
+  "mygolf.golf_item_group": "Golf"
+}

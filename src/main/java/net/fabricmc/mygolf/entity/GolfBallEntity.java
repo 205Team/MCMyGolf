@@ -37,7 +37,7 @@ public class GolfBallEntity extends BaseEntity implements EntityPhysicsElement {
 
     public GolfBallEntity(EntityType<? extends LivingEntity> entityType, World level) {
         super(entityType, level);
-        this.rigidBody.setCollisionShape(new SphereCollisionShape(1F));
+        //this.rigidBody.setCollisionShape(new SphereCollisionShape(1F));
         this.rigidBody.setMass(rigidBodyMass);
     }
 

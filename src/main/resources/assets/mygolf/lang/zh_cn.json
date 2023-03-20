@@ -5,5 +5,6 @@
   "item.mygolf.golf_club": "高尔夫球杆",
   "item.mygolf.iron_stick": "铁棍",
   "item.mygolf.golf_ball": "高尔夫球",
-  "item.mygolf.intro_book": "高尔夫球说明"
+  "item.mygolf.intro_book": "高尔夫球说明",
+  "mygolf.golf_item_group": "高尔夫"
 }

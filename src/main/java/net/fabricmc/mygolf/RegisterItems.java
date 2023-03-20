@@ -1,5 +1,6 @@
 package net.fabricmc.mygolf;
 
+import net.fabricmc.fabric.api.itemgroup.v1.FabricItemGroup;
 import net.fabricmc.mygolf.global.CommonStr;
 import net.fabricmc.mygolf.items.GolfBall;
 import net.fabricmc.mygolf.items.GolfClub;
@@ -7,8 +8,11 @@ import net.fabricmc.mygolf.items.IntroBook;
 import net.fabricmc.mygolf.items.IronStick;
 import net.fabricmc.mygolf.items.base.BaseItem;
 import net.minecraft.item.Item;
+import net.minecraft.item.ItemGroup;
+import net.minecraft.item.ItemStack;
 import net.minecraft.registry.Registries;
 import net.minecraft.registry.Registry;
+import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
 
 /**
@@ -49,5 +53,4 @@ public class RegisterItems {
     private static void registryItem(Item item, String codeName) {
         Registry.register(Registries.ITEM, new Identifier(CommonStr.modId, codeName), item);
     }
-
 }
