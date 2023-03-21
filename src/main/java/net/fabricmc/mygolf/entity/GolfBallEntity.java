@@ -4,6 +4,7 @@ import com.jme3.bullet.collision.shapes.SphereCollisionShape;
 import com.jme3.math.Vector3f;
 import dev.lazurite.rayon.api.EntityPhysicsElement;
 import dev.lazurite.rayon.impl.bullet.collision.body.EntityRigidBody;
+import dev.lazurite.rayon.impl.bullet.collision.space.MinecraftSpace;
 import dev.lazurite.rayon.impl.bullet.thread.PhysicsThread;
 import net.fabricmc.fabric.api.event.player.AttackEntityCallback;
 import net.fabricmc.fabric.api.event.player.UseEntityCallback;
@@ -37,10 +38,8 @@ public class GolfBallEntity extends BaseEntity implements EntityPhysicsElement {
 
     public GolfBallEntity(EntityType<? extends LivingEntity> entityType, World level) {
         super(entityType, level);
-        //this.rigidBody.setCollisionShape(new SphereCollisionShape(1F));
         this.rigidBody.setMass(rigidBodyMass);
     }
-
 
     @Override
     public EntityRigidBody getRigidBody() {
@@ -93,7 +92,7 @@ public class GolfBallEntity extends BaseEntity implements EntityPhysicsElement {
                         .entityFactory(GolfBallEntity::new)
                         .spawnGroup(SpawnGroup.MISC)
                         .defaultAttributes(LivingEntity::createLivingAttributes)
-                        .dimensions(EntityDimensions.fixed(0.75f, 0.75f))
+                        .dimensions(EntityDimensions.fixed(0.5f, 0.5f))
                         .trackRangeBlocks(80)
                         .build());
     }

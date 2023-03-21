@@ -22,16 +22,14 @@ public class GolfBallEntityRenderer extends EntityRenderer<GolfBallEntity> {
     public GolfBallEntityRenderer(EntityRendererFactory.Context context) {
         super(context);
         this.model = new GolfBallEntityModel(context.getPart(MyGolfModClient.MODEL_CUBE_LAYER));
-        this.shadowRadius = 0.5f;
+        this.shadowRadius = 0.2f;
     }
 
     public void render(GolfBallEntity ballEntity, float yaw, float delta, MatrixStack matrixStack, VertexConsumerProvider multiBufferSource, int i) {
         final var rot = Convert.toMinecraft(ballEntity.getPhysicsRotation(new Quaternion(), delta));
-        final var box = ballEntity.getBoundingBox();
 
         matrixStack.push();
         matrixStack.multiply(rot);
-        //matrixStack.translate(box.getXLength() * -0.5, box.getYLength() * -0.5, box.getZLength() * -0.5);
 
         final var vertexConsumer = multiBufferSource.getBuffer(model.getLayer(this.getTexture(ballEntity)));
         model.render(matrixStack, vertexConsumer, i, OverlayTexture.DEFAULT_UV, 1.0F, 1.0F, 1.0F, 1.0F);
