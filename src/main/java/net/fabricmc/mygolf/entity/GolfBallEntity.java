@@ -1,10 +1,8 @@
 package net.fabricmc.mygolf.entity;
 
-import com.jme3.bullet.collision.shapes.SphereCollisionShape;
 import com.jme3.math.Vector3f;
 import dev.lazurite.rayon.api.EntityPhysicsElement;
 import dev.lazurite.rayon.impl.bullet.collision.body.EntityRigidBody;
-import dev.lazurite.rayon.impl.bullet.collision.space.MinecraftSpace;
 import dev.lazurite.rayon.impl.bullet.thread.PhysicsThread;
 import net.fabricmc.fabric.api.event.player.AttackEntityCallback;
 import net.fabricmc.fabric.api.event.player.UseEntityCallback;
@@ -13,7 +11,7 @@ import net.fabricmc.mygolf.MyGolfMod;
 import net.fabricmc.mygolf.RegisterItems;
 import net.fabricmc.mygolf.entity.base.BaseEntity;
 import net.fabricmc.mygolf.global.CommonStr;
-import net.fabricmc.mygolf.items.GolfClub;
+import net.fabricmc.mygolf.items.GolfClubItem;
 import net.minecraft.block.BlockState;
 import net.minecraft.entity.*;
 import net.minecraft.entity.damage.DamageSource;
@@ -75,7 +73,7 @@ public class GolfBallEntity extends BaseEntity implements EntityPhysicsElement {
     /// 被玩家击打
     public void hitByPlayer(PlayerEntity player) {
         /// 被高尔夫球杆击打则次数+1
-        if (player.getMainHandStack().getItem() instanceof GolfClub) {
+        if (player.getMainHandStack().getItem() instanceof GolfClubItem) {
             hitTimes++;
             MyGolfMod.LOGGER.info("击打次数为" + hitTimes);
         }
@@ -158,10 +156,6 @@ public class GolfBallEntity extends BaseEntity implements EntityPhysicsElement {
                         player.giveItemStack(new ItemStack(RegisterItems.GOLF_BALL));
                         return ActionResult.SUCCESS;
                     }
-                }
-                if (mainHandStack.isOf(RegisterItems.GOLF_CLUB_TOOL)){
-                    player.sendMessage(Text.of(player + "击打次数为" + hitTimes));
-                    return ActionResult.SUCCESS;
                 }
             }
             return ActionResult.PASS;
