@@ -19,7 +19,6 @@ import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.ItemStack;
 import net.minecraft.registry.Registries;
 import net.minecraft.registry.Registry;
-import net.minecraft.text.Text;
 import net.minecraft.util.ActionResult;
 import net.minecraft.util.Hand;
 import net.minecraft.util.Identifier;
@@ -86,7 +85,8 @@ public class GolfBallEntity extends BaseEntity implements EntityPhysicsElement {
         return Registry.register(
                 Registries.ENTITY_TYPE,
                 new Identifier(CommonStr.modId, "golf_ball_entity"),
-                FabricEntityTypeBuilder.createLiving()
+                FabricEntityTypeBuilder
+                        .createLiving()
                         .entityFactory(GolfBallEntity::new)
                         .spawnGroup(SpawnGroup.MISC)
                         .defaultAttributes(LivingEntity::createLivingAttributes)

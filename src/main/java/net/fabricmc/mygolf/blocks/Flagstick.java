@@ -58,6 +58,10 @@ public class Flagstick extends BaseBlockWithEntity implements BlockEntityProvide
         return SHAPE;
     }
 
+    public boolean canMobSpawnInside() {
+        return true;
+    }
+
     @Override
     public VoxelShape getCollisionShape(BlockState state, BlockView view, BlockPos pos, ShapeContext context) {
         return VoxelShapes.empty();

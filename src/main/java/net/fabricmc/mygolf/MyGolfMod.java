@@ -29,6 +29,8 @@ public class MyGolfMod implements ModInitializer {
 		RegisterItems.registryItems();
   		//注册物品组
 		RegisterItemGroups.registryItemGroup();
+		//注册Rayon相关项
+		RegisterRayonRelated.registryRayonRelated();
 
 		LOGGER.info("Hello Fabric world!");
 	}
