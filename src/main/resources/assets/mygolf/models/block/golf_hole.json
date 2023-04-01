@@ -4,7 +4,6 @@
 	"texture_size": [32, 32],
 	"textures": {
 		"1": "mygolf:block/golf_hole",
-		"2": "mygolf:block/transparent",
 		"particle": "mygolf:block/golf_hole",
 		"overlay": "mygolf:block/golf_hole_side_overlay"
 	},

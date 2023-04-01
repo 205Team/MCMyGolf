@@ -65,7 +65,6 @@ public class GolfHole extends BaseBlock {
 
                 World world = golfBall.getWorld();
                 // 获取球洞方块的碰撞箱
-                // 获取球洞方块的碰撞箱
                 Box holeBox = terrain.getBlockState().getCollisionShape(world, terrain.getBlockPos()).getBoundingBox();
                 // 将碰撞箱转换为世界坐标系中的位置和大小
                 holeBox = holeBox.offset(terrain.getBlockPos());
@@ -125,18 +124,6 @@ public class GolfHole extends BaseBlock {
             }
             world.updateComparators(pos, this);
             super.onStateReplaced(state, world, pos, newState, moved);
-        }
-    }
-
-    @Override
-    public void onEntityCollision(BlockState state, World world, BlockPos pos, Entity entity) {
-        System.out.println("in");
-        if (entity instanceof GolfBallEntity) {
-            world.setBlockState(pos, state.with(SCORE, state.get(SCORE) + 1));
-            System.out.println("Holed");
-        }
-        if (entity instanceof ChickenEntity) {
-            System.out.println("Chickened");
         }
     }
 }
