@@ -1,24 +1,21 @@
 package net.fabricmc.mygolf.blocks;
 
+import dev.lazurite.rayon.api.event.collision.ElementCollisionEvents;
 import net.fabricmc.mygolf.RegisterBlocks;
-import net.fabricmc.mygolf.RegisterEntities;
-import net.fabricmc.mygolf.blockEntity.FlagstickEntity;
 import net.fabricmc.mygolf.blocks.base.BaseBlock;
 import net.fabricmc.mygolf.entity.GolfBallEntity;
 import net.minecraft.block.*;
-import net.minecraft.block.entity.BlockEntity;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.ai.pathing.NavigationType;
 import net.minecraft.entity.passive.ChickenEntity;
 import net.minecraft.item.Item;
-import net.minecraft.item.ItemStack;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.sound.BlockSoundGroup;
 import net.minecraft.state.StateManager;
 import net.minecraft.state.property.IntProperty;
-import net.minecraft.text.Text;
 import net.minecraft.util.function.BooleanBiFunction;
 import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Box;
 import net.minecraft.util.shape.VoxelShape;
 import net.minecraft.util.shape.VoxelShapes;
 import net.minecraft.world.BlockView;
@@ -27,18 +24,59 @@ import net.minecraft.world.World;
 public class GolfHole extends BaseBlock {
 
     public static final IntProperty SCORE;
-    private static final VoxelShape RAYCAST_SHAPE;
     protected static final VoxelShape OUTLINE_SHAPE;
+    private static final VoxelShape RAYCAST_SHAPE;
+
+    static {
+        SCORE = IntProperty.of("score", 0, 32);
+        RAYCAST_SHAPE = VoxelShapes.union(createCuboidShape(2.0, 2.0, 2.0, 14.0, 16.0, 14.0), new VoxelShape[]{createCuboidShape(1.0, 2.0, 3.0, 15.0, 16.0, 13.0), createCuboidShape(3.0, 2.0, 1.0, 13.0, 16.0, 15.0)});
+        //createCuboidShape(2.0, 2.0, 2.0, 14.0, 16.0, 14.0);
+        OUTLINE_SHAPE = VoxelShapes.combineAndSimplify(VoxelShapes.fullCube(), RAYCAST_SHAPE, BooleanBiFunction.ONLY_FIRST);
+    }
+
     public GolfHole(AbstractBlock.Settings settings) {
         super(settings);
         this.setDefaultState((this.stateManager.getDefaultState()).with(SCORE, 0));
     }
 
-    public static GolfHole defaultInstance() { return new GolfHole(defaultSetting());   }
+    public static GolfHole defaultInstance() {
+        return new GolfHole(defaultSetting());
+    }
 
     //默认设置
     private static AbstractBlock.Settings defaultSetting() {
         return AbstractBlock.Settings.of(Material.SOLID_ORGANIC, MapColor.RED).ticksRandomly().strength(0.6F).sounds(BlockSoundGroup.GRASS);
+    }
+
+    /**
+     * 事件注册
+     */
+    public static void registerEvents() {
+        //进球事件
+        ElementCollisionEvents.BLOCK_COLLISION.register(golfBallInside());
+    }
+
+    //进球事件
+    private static ElementCollisionEvents.BlockCollision golfBallInside() {
+        return (element, terrain, impulse) -> {
+            if (element instanceof GolfBallEntity && terrain.getBlockState().getBlock().equals(RegisterBlocks.GOLF_HOLE)) {
+                //类型转换
+                GolfBallEntity golfBall = (GolfBallEntity) element;
+
+                World world = golfBall.getWorld();
+                // 获取球洞方块的碰撞箱
+                // 获取球洞方块的碰撞箱
+                Box holeBox = terrain.getBlockState().getCollisionShape(world, terrain.getBlockPos()).getBoundingBox();
+                // 将碰撞箱转换为世界坐标系中的位置和大小
+                holeBox = holeBox.offset(terrain.getBlockPos());
+                // 获取球体的碰撞箱
+                Box ballBox = golfBall.getBoundingBox();
+                // 检测球体中心是否包含在球洞的碰撞箱内部
+                if (holeBox.contains(ballBox.getCenter())) {
+                    System.out.println("Golf ball enters the hole!!");
+                }
+            }
+        };
     }
 
     public Item.Settings itemDefaultSetting() {
@@ -81,7 +119,7 @@ public class GolfHole extends BaseBlock {
             if (world instanceof ServerWorld) {
                 BlockPos upBlockPos = pos.up();
                 BlockState upBlockState = world.getBlockState(upBlockPos);
-                if(upBlockState.isOf(RegisterBlocks.FLAGSTICK)){
+                if (upBlockState.isOf(RegisterBlocks.FLAGSTICK)) {
                     world.breakBlock(upBlockPos, false);
                 }
             }
@@ -93,19 +131,14 @@ public class GolfHole extends BaseBlock {
     @Override
     public void onEntityCollision(BlockState state, World world, BlockPos pos, Entity entity) {
         System.out.println("in");
-        if(entity instanceof GolfBallEntity){
+        if (entity instanceof GolfBallEntity) {
             world.setBlockState(pos, state.with(SCORE, state.get(SCORE) + 1));
             System.out.println("Holed");
         }
-        if(entity instanceof ChickenEntity){
+        if (entity instanceof ChickenEntity) {
             System.out.println("Chickened");
         }
     }
-
-    static {
-        SCORE = IntProperty.of("score", 0, 32);
-        RAYCAST_SHAPE = VoxelShapes.union(createCuboidShape(2.0, 2.0, 2.0, 14.0, 16.0, 14.0), new VoxelShape[]{createCuboidShape(1.0, 2.0, 3.0, 15.0, 16.0, 13.0), createCuboidShape(3.0, 2.0, 1.0, 13.0, 16.0, 15.0)});
-                        //createCuboidShape(2.0, 2.0, 2.0, 14.0, 16.0, 14.0);
-        OUTLINE_SHAPE = VoxelShapes.combineAndSimplify(VoxelShapes.fullCube(), RAYCAST_SHAPE, BooleanBiFunction.ONLY_FIRST);
-    }
 }
+
+
