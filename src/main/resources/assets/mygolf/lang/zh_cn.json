@@ -6,4 +6,6 @@
   "item.mygolf.iron_stick": "铁棍",
   "item.mygolf.golf_ball": "高尔夫球",
   "item.mygolf.intro_book": "高尔夫球说明",
+  "sound.mygolf.golf_ball_hit": "高尔夫球击打",
+  "sound.mygolf.golf_club_swing": "高尔夫球棒挥动"
 }

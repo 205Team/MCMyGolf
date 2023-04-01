@@ -1,12 +1,12 @@
 {
   "golf_ball_hit": {
-    "subtitle": "Golf Ball Hit",
+    "subtitle": "sound.mygolf.golf_ball_hit",
     "sounds": [
       "mygolf:golf_ball_hit"
     ]
   },
   "golf_club_swing": {
-    "subtitle": "Golf Club Swing",
+    "subtitle": "sound.mygolf.golf_club_swing",
     "sounds": [
       "mygolf:golf_club_swing"
     ]

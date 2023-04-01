@@ -23,9 +23,6 @@ public class RegisterEvents {
         //球洞事件
         GolfHole.registerEvents();
 
-        //注册声音事件
-        RegisterSounds.registrySounds();
-
     }
 
     /**

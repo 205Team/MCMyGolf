@@ -2,29 +2,24 @@ package net.fabricmc.mygolf.items;
 
 import com.jme3.math.Vector3f;
 import dev.lazurite.rayon.impl.bullet.thread.PhysicsThread;
-import dev.lazurite.toolbox.api.event.ClientEvents;
-import net.fabricmc.mygolf.RegisterEntities;
 import net.fabricmc.mygolf.RegisterSounds;
 import net.fabricmc.mygolf.entity.GolfBallEntity;
 import net.fabricmc.mygolf.items.base.ItemAbstract;
 import net.fabricmc.mygolf.tools.StringTool;
-import net.minecraft.entity.Entity;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.item.*;
+import net.minecraft.item.Item;
+import net.minecraft.item.ItemStack;
 import net.minecraft.sound.SoundCategory;
 import net.minecraft.text.Text;
-import net.minecraft.text.TranslatableTextContent;
 import net.minecraft.util.Hand;
 import net.minecraft.util.TypedActionResult;
 import net.minecraft.util.UseAction;
-import net.minecraft.util.hit.BlockHitResult;
-import net.minecraft.util.hit.EntityHitResult;
-import net.minecraft.util.hit.HitResult;
-import net.minecraft.util.math.*;
-import net.minecraft.world.RaycastContext;
+import net.minecraft.util.math.Box;
+import net.minecraft.util.math.MathHelper;
+import net.minecraft.util.math.Vec2f;
+import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.World;
-import org.jetbrains.annotations.NotNull;
 
 import java.util.Comparator;
 import java.util.List;
@@ -35,7 +30,7 @@ public class GolfClubItem extends Item implements ItemAbstract {
     // 定义蓄力的最长时间，单位为 tick
     private static final int MAX_USE_TIME = 40;
     // 定义最大初速度
-    private static  final float MAX_BALL_SPEED = 40;
+    private static final float MAX_BALL_SPEED = 40;
 
     public GolfClubItem(Item.Settings settings) {
         super(settings);
@@ -80,17 +75,14 @@ public class GolfClubItem extends Item implements ItemAbstract {
                     });
                     ball.hitByPlayer(player);
 
-                    playHitSound(world, player);
+                    playHitSound(world, player, (float) (0.5 + power * 0.5));
                     player.sendMessage(Text.of(String.format("%.1f%%", power * 100)));
                 }
-            }else {
+            } else {
                 playSwingSound(world, player);
             }
-//            player.playSound(MyMod.SOUND_SWING_GOLF_CLUB, power * 0.5f + 0.5f, 1.0f + power * 0.5f);
         }
     }
-
-
 
 
     // 重写 getMaxUseTime 方法，返回蓄力最长时间
@@ -134,32 +126,17 @@ public class GolfClubItem extends Item implements ItemAbstract {
         return power;
     }
 
-    // 播放声音
-    private void playHitSound(World world, PlayerEntity player) {
+    // 播放击球声音
+    private void playHitSound(World world, PlayerEntity player, float volume) {
         if (!world.isClient) {
-            world.playSound(
-                    null, // Player - if non-null, will play sound for every nearby player *except* the specified player
-                    player.getBlockPos(), // The position of where the sound will come from
-                    RegisterSounds.GOLF_BALL_HIT_SOUND_EVENT, // The sound that will play
-                    SoundCategory.BLOCKS, // This determines which of the volume sliders affect this sound
-                    1f, //Volume multiplier, 1 is normal, 0.5 is half volume, etc
-                    1f // Pitch multiplier, 1 is normal, 0.5 is half pitch, etc
-            );
-            System.out.println("sound");
+            world.playSound(null, player.getBlockPos(), RegisterSounds.GOLF_BALL_HIT_SOUND_EVENT, SoundCategory.BLOCKS, 1f, 1f);
         }
     }
 
+    // 播放挥空声音
     private void playSwingSound(World world, PlayerEntity player) {
         if (!world.isClient) {
-            world.playSound(
-                    null, // Player - if non-null, will play sound for every nearby player *except* the specified player
-                    player.getBlockPos(), // The position of where the sound will come from
-                    RegisterSounds.GOLF_CLUB_SWING_SOUND_EVENT, // The sound that will play
-                    SoundCategory.BLOCKS, // This determines which of the volume sliders affect this sound
-                    1f, //Volume multiplier, 1 is normal, 0.5 is half volume, etc
-                    1f // Pitch multiplier, 1 is normal, 0.5 is half pitch, etc
-            );
-            System.out.println("sound");
+            world.playSound(null, player.getBlockPos(), RegisterSounds.GOLF_CLUB_SWING_SOUND_EVENT, SoundCategory.BLOCKS, 1f, 1f);
         }
     }
 

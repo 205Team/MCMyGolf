@@ -2,9 +2,10 @@
   "block.mygolf.golf_ball": "Golf Ball",
   "block.mygolf.flagstick": "Flagstick",
   "block.mygolf.golf_hole": "Golf Hole",
-  "item.mygolf.golf_club_item": "Golf Club Item",
+  "item.mygolf.golf_club_item": "Golf Club",
   "item.mygolf.iron_stick": "Iron Stick",
   "item.mygolf.golf_ball": "Golf Ball",
-  "item.mygolf.intro_book": "Intro Book",
-  "mygolf.golf_item_group": "Golf"
+  "item.mygolf.intro_book": "Golf Ball Introduction",
+  "sound.mygolf.golf_ball_hit": "Golf Ball Hit",
+  "sound.mygolf.golf_club_swing": "Golf Club Swing"
 }
