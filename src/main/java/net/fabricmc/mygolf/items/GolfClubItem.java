@@ -2,7 +2,9 @@ package net.fabricmc.mygolf.items;
 
 import com.jme3.math.Vector3f;
 import dev.lazurite.rayon.impl.bullet.thread.PhysicsThread;
+import dev.lazurite.toolbox.api.event.ClientEvents;
 import net.fabricmc.mygolf.RegisterEntities;
+import net.fabricmc.mygolf.RegisterSounds;
 import net.fabricmc.mygolf.entity.GolfBallEntity;
 import net.fabricmc.mygolf.items.base.ItemAbstract;
 import net.fabricmc.mygolf.tools.StringTool;
@@ -10,6 +12,7 @@ import net.minecraft.entity.Entity;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.*;
+import net.minecraft.sound.SoundCategory;
 import net.minecraft.text.Text;
 import net.minecraft.text.TranslatableTextContent;
 import net.minecraft.util.Hand;
@@ -21,6 +24,7 @@ import net.minecraft.util.hit.HitResult;
 import net.minecraft.util.math.*;
 import net.minecraft.world.RaycastContext;
 import net.minecraft.world.World;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.Comparator;
 import java.util.List;
@@ -76,8 +80,11 @@ public class GolfClubItem extends Item implements ItemAbstract {
                     });
                     ball.hitByPlayer(player);
 
+                    playHitSound(world, player);
                     player.sendMessage(Text.of(String.format("%.1f%%", power * 100)));
                 }
+            }else {
+                playSwingSound(world, player);
             }
 //            player.playSound(MyMod.SOUND_SWING_GOLF_CLUB, power * 0.5f + 0.5f, 1.0f + power * 0.5f);
         }
@@ -127,6 +134,34 @@ public class GolfClubItem extends Item implements ItemAbstract {
         return power;
     }
 
+    // 播放声音
+    private void playHitSound(World world, PlayerEntity player) {
+        if (!world.isClient) {
+            world.playSound(
+                    null, // Player - if non-null, will play sound for every nearby player *except* the specified player
+                    player.getBlockPos(), // The position of where the sound will come from
+                    RegisterSounds.GOLF_BALL_HIT_SOUND_EVENT, // The sound that will play
+                    SoundCategory.BLOCKS, // This determines which of the volume sliders affect this sound
+                    1f, //Volume multiplier, 1 is normal, 0.5 is half volume, etc
+                    1f // Pitch multiplier, 1 is normal, 0.5 is half pitch, etc
+            );
+            System.out.println("sound");
+        }
+    }
+
+    private void playSwingSound(World world, PlayerEntity player) {
+        if (!world.isClient) {
+            world.playSound(
+                    null, // Player - if non-null, will play sound for every nearby player *except* the specified player
+                    player.getBlockPos(), // The position of where the sound will come from
+                    RegisterSounds.GOLF_CLUB_SWING_SOUND_EVENT, // The sound that will play
+                    SoundCategory.BLOCKS, // This determines which of the volume sliders affect this sound
+                    1f, //Volume multiplier, 1 is normal, 0.5 is half volume, etc
+                    1f // Pitch multiplier, 1 is normal, 0.5 is half pitch, etc
+            );
+            System.out.println("sound");
+        }
+    }
 
     @Override
     public String codeName() {
