@@ -1,0 +1,26 @@
+{
+	"credit": "Made with Blockbench",
+	"parent": "builtin/generated",
+	"textures": {
+		"layer0": "mygolf:item/golf_ball"
+	},
+	"display": {
+		"thirdperson_righthand": {
+			"translation": [0, 0.75, -0.25],
+			"scale": [0.3, 0.3, 0.3]
+		},
+		"thirdperson_lefthand": {
+			"scale": [0.3, 0.3, 0.3]
+		},
+		"firstperson_righthand": {
+			"scale": [0.3, 0.3, 0.3]
+		},
+		"firstperson_lefthand": {
+			"scale": [0.3, 0.3, 0.3]
+		},
+		"ground": {
+			"translation": [0, -0.75, 0],
+			"scale": [0.3, 0.3, 0.3]
+		}
+	}
+}

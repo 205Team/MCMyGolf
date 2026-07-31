@@ -1,0 +1,5 @@
+{
+  "variants": {
+    "": { "model": "mygolf:block/golf_hole" }
+  }
+}

@@ -2,7 +2,6 @@
   "schemaVersion": 1,
   "id": "mygolf",
   "version": "${version}",
-
   "name": "MyGolf Mod",
   "description": "Play Golf!",
   "authors": [
@@ -12,24 +11,27 @@
   "contact": {
     "sources": "https://github.com/205Team/MCMyGolf"
   },
-
   "license": "CC0-1.0",
   "icon": "assets/mygolf/icon.png",
-
   "environment": "*",
   "entrypoints": {
+    "fabric-datagen": [
+      "net.fabricmc.mygolf.DataGeneration"
+    ],
     "main": [
       "net.fabricmc.mygolf.MyGolfMod"
+    ],
+    "client": [
+      "net.fabricmc.mygolf.MyGolfModClient"
     ]
   },
   "mixins": [
     "mygolf.mixins.json"
   ],
-
   "depends": {
-    "fabricloader": ">=0.14.10",
+    "fabricloader": ">=0.15.10",
     "fabric-api": "*",
-    "minecraft": "~1.19",
+    "minecraft": "~1.20.1",
     "java": ">=17"
   },
   "suggests": {

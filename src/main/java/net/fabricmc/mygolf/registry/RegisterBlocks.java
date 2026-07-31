@@ -1,0 +1,59 @@
+package net.fabricmc.mygolf.registry;
+
+import net.fabricmc.mygolf.blocks.Flagstick;
+import net.fabricmc.mygolf.blocks.GolfHole;
+import net.fabricmc.mygolf.blocks.base.BaseBlock;
+import net.fabricmc.mygolf.blocks.base.BaseBlockWithEntity;
+import net.fabricmc.mygolf.global.CommonStr;
+import net.minecraft.block.Block;
+import net.minecraft.item.BlockItem;
+import net.minecraft.item.Item;
+import net.minecraft.registry.Registries;
+import net.minecraft.registry.Registry;
+import net.minecraft.util.Identifier;
+
+public class RegisterBlocks {
+    /**
+     * 方块声明
+     */
+    public static final Flagstick FLAGSTICK = Flagstick.defaultInstance();    //红旗杆方块
+    public static final GolfHole GOLF_HOLE = GolfHole.defaultInstance();    //球洞方块
+
+    /**
+     * 注册方块
+     */
+    public static void registryBlocks() {
+        registryBlock(FLAGSTICK);
+        registryBlock(GOLF_HOLE);
+    }
+
+    /**
+     * 注册新BaseBlock
+     *
+     * @param block 物品
+     */
+    private static void registryBlock(BaseBlock block) {
+        registryBlock(block, block.codeName(), block.itemDefaultSetting());
+    }
+
+    /**
+     * 注册新BaseBlockWithEntity
+     *
+     * @param block 物品
+     */
+    public static void registryBlock(BaseBlockWithEntity block) {
+        registryBlock(block, block.codeName(), block.itemDefaultSetting());
+    }
+
+    /**
+     * 注册新block
+     *
+     * @param block    方块
+     * @param codeName 代号
+     * @param settings BlockItem的设置
+     */
+    private static void registryBlock(Block block, String codeName, Item.Settings settings) {
+        Registry.register(Registries.BLOCK, new Identifier(CommonStr.modId, codeName), block);
+        Registry.register(Registries.ITEM, new Identifier(CommonStr.modId, codeName), new BlockItem(block, settings));
+    }
+}

@@ -1,0 +1,23 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "FL ",
+    "LW ",
+    "   "
+  ],
+  "key": {
+    "F": {
+      "item": "minecraft:feather"
+    },
+    "L": {
+      "item": "minecraft:leather"
+    },
+    "W": {
+      "item": "minecraft:white_dye"
+    }
+  },
+  "result": {
+    "item": "mygolf:golf_ball",
+    "count": 2
+  }
+}
