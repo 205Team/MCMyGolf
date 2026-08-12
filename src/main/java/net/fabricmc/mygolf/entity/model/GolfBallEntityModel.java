@@ -19,13 +19,12 @@ public class GolfBallEntityModel extends EntityModel<GolfBallEntity> {
     public static TexturedModelData getTexturedModelData() {
         ModelData modelData = new ModelData();
         ModelPartData modelPartData = modelData.getRoot();
-        ModelPartData bone = modelPartData.addChild("base", ModelPartBuilder.create().uv(0, 0).cuboid(-3.0F, -3.0F, -3.0F, 6.0F, 6.0F, 6.0F, new Dilation(0.0F))
-                .uv(1, 4).cuboid(-2.0F, 3.0F, -2.0F, 4.0F, 1.0F, 4.0F, new Dilation(0.0F))
-                .uv(4, 2).cuboid(-2.0F, -4.0F, -2.0F, 4.0F, 1.0F, 4.0F, new Dilation(0.0F))
-                .uv(1, 1).cuboid(-2.0F, -2.0F, -4.0F, 4.0F, 4.0F, 1.0F, new Dilation(0.0F))
-                .uv(0, 1).cuboid(-2.0F, -2.0F, 3.0F, 4.0F, 4.0F, 1.0F, new Dilation(0.0F))
-                .uv(0, 4).cuboid(3.0F, -2.0F, -2.0F, 1.0F, 4.0F, 4.0F, new Dilation(0.0F))
-                .uv(4, 5).cuboid(-4.0F, -2.0F, -2.0F, 1.0F, 4.0F, 4.0F, new Dilation(0.0F)), ModelTransform.pivot(0.0F, 0.0F, 0.0F));
+        ModelPartData bone = modelPartData.addChild("base",
+                ModelPartBuilder.create()
+                        .uv(0, 0)
+                        .cuboid(-2.0F, -2.0F, -2.0F, 4.0F, 4.0F, 4.0F, new Dilation(0.0F)),
+                ModelTransform.pivot(0.0F, 0.0F, 0.0F)
+        );
         return TexturedModelData.of(modelData, 32, 32);
     }
 

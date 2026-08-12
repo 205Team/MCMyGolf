@@ -1,11 +1,12 @@
 {
   "block.mygolf.golf_ball": "高尔夫球",
-  "block.mygolf.flagstick": "红旗杆",
+  "block.mygolf.flagstick_block": "红旗杆方块",
   "block.mygolf.golf_hole": "球洞",
   "item.mygolf.golf_club_item": "高尔夫球杆",
   "item.mygolf.iron_stick": "铁棍",
   "item.mygolf.golf_ball": "高尔夫球",
   "item.mygolf.intro_book": "高尔夫球说明",
+  "item.mygolf.flagstick_item": "红旗杆",
   "itemGroup.mygolf.golf_group": "高尔夫",
   "sound.mygolf.golf_ball_hit": "高尔夫球击打",
   "sound.mygolf.golf_club_swing": "高尔夫球棒挥动"

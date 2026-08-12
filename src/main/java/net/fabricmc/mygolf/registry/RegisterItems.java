@@ -2,16 +2,15 @@ package net.fabricmc.mygolf.registry;
 
 import net.fabricmc.fabric.api.itemgroup.v1.FabricItemGroup;
 import net.fabricmc.mygolf.global.CommonStr;
-import net.fabricmc.mygolf.items.GolfBall;
-import net.fabricmc.mygolf.items.GolfClubItem;
-import net.fabricmc.mygolf.items.IntroBook;
-import net.fabricmc.mygolf.items.IronStick;
+import net.fabricmc.mygolf.items.*;
 import net.fabricmc.mygolf.items.base.BaseItem;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemGroup;
 import net.minecraft.item.ItemStack;
 import net.minecraft.registry.Registries;
 import net.minecraft.registry.Registry;
+import net.minecraft.registry.RegistryKey;
+import net.minecraft.registry.RegistryKeys;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
 
@@ -26,22 +25,28 @@ public class RegisterItems {
     public static final GolfClubItem GOLF_CLUB_TOOL = GolfClubItem.defaultInstance();       //高尔夫球杆
     public static final IronStick IRON_STICK_ITEM = IronStick.defaultInstance();       //铁棒
     public static final IntroBook INTRO_BOOK = IntroBook.defaultInstance(); //介绍书
+    public static final FlagstickItem FLAGSTICK_ITEM = FlagstickItem.defaultInstance(); //介绍书
 
     /**
      * 注册新item group
      */
+    public static final RegistryKey<ItemGroup> GOLF_GROUP_KEY = RegistryKey.of(
+            RegistryKeys.ITEM_GROUP,
+            new Identifier(CommonStr.modId, "golf_item_group")
+    );
+
     public static final ItemGroup GOLF_GROUP = Registry.register(
             Registries.ITEM_GROUP,
-            new Identifier(CommonStr.modId, "golf_item_group"),
+            GOLF_GROUP_KEY,
             FabricItemGroup.builder()
-                    .icon(() -> new ItemStack(GOLF_CLUB_TOOL))
+                    .icon(() -> new ItemStack(GOLF_BALL))
                     .displayName(Text.translatable("itemGroup.mygolf.golf_group"))
                     .entries((displayContext, entries) -> {
                         entries.add(INTRO_BOOK);
                         entries.add(GOLF_CLUB_TOOL);
                         entries.add(GOLF_BALL);
                         entries.add(IRON_STICK_ITEM);
-                        entries.add(RegisterBlocks.FLAGSTICK);
+                        entries.add(FLAGSTICK_ITEM);
                     })
                     .build()
     );
@@ -54,6 +59,7 @@ public class RegisterItems {
         registryItem(GOLF_CLUB_TOOL, GOLF_CLUB_TOOL.codeName());
         registryItem(IRON_STICK_ITEM);
         registryItem(INTRO_BOOK);
+        registryItem(FLAGSTICK_ITEM);
     }
 
     /**

@@ -17,12 +17,12 @@ public class MyGolfMod implements ModInitializer {
 
         @Override
         public void onInitialize() {
-                //注册物品
-                RegisterItems.registryItems();
                 //注册方块
                 RegisterBlocks.registryBlocks();
                 //注册方块实体
                 RegisterBlockEntities.registerBlockEntities();
+                //注册物品
+                RegisterItems.registryItems();
                 //注册实体
                 RegisterEntities.registryEntities();
                 //注册声音

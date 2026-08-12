@@ -1,9 +1,9 @@
 {
   "type": "minecraft:crafting_shaped",
   "pattern": [
-    " RI",
-    "RRI",
-    "  I"
+    "IR ",
+    "I  ",
+    "I  "
   ],
   "key": {
     "R": {
@@ -14,7 +14,7 @@
     }
   },
   "result": {
-    "item": "mygolf:flagstick",
+    "item": "mygolf:flagstick_item",
     "count": 1
   }
 }

@@ -4,24 +4,24 @@ import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.fabricmc.fabric.api.blockrenderlayer.v1.BlockRenderLayerMap;
-import net.fabricmc.fabric.api.client.rendering.v1.BlockEntityRendererRegistry;
-import net.fabricmc.fabric.api.client.rendering.v1.ColorProviderRegistry;
-import net.fabricmc.fabric.api.client.rendering.v1.EntityModelLayerRegistry;
-import net.fabricmc.fabric.api.client.rendering.v1.EntityRendererRegistry;
+import net.fabricmc.fabric.api.client.rendering.v1.*;
 import net.fabricmc.mygolf.blockEntity.render.FlagstickEntityRenderer;
 import net.fabricmc.mygolf.blockEntity.render.FlagstickScreen;
 import net.fabricmc.mygolf.blockEntity.render.FlagstickScreenHandler;
 import net.fabricmc.mygolf.entity.model.GolfBallEntityModel;
 import net.fabricmc.mygolf.entity.renderer.GolfBallEntityRenderer;
+import net.fabricmc.mygolf.events.client.GolfHudOverlay;
 import net.fabricmc.mygolf.global.CommonStr;
 import net.fabricmc.mygolf.registry.RegisterBlockEntities;
 import net.fabricmc.mygolf.registry.RegisterBlocks;
 import net.fabricmc.mygolf.registry.RegisterEntities;
+import net.fabricmc.mygolf.registry.RegisterItems;
 import net.minecraft.client.color.world.BiomeColors;
 import net.minecraft.client.color.world.GrassColors;
 import net.minecraft.client.gui.screen.ingame.HandledScreens;
 import net.minecraft.client.render.RenderLayer;
 import net.minecraft.client.render.entity.model.EntityModelLayer;
+import net.minecraft.item.DyeableItem;
 import net.minecraft.registry.Registries;
 import net.minecraft.registry.Registry;
 import net.minecraft.resource.featuretoggle.FeatureFlags;
@@ -52,6 +52,8 @@ public class MyGolfModClient implements ClientModInitializer {
 
         BlockEntityRendererRegistry.register(RegisterBlockEntities.FLAGSTICK_ENTITY, FlagstickEntityRenderer::new);
 
+        HudRenderCallback.EVENT.register(new GolfHudOverlay());
+
         Registry.register(Registries.SCREEN_HANDLER, new Identifier(CommonStr.modId, "flagstick"), FLAGSTICK_SCREEN_HANDLER);
 
         BlockRenderLayerMap.INSTANCE.putBlocks(RenderLayer.getCutoutMipped(), RegisterBlocks.GOLF_HOLE);
@@ -59,6 +61,17 @@ public class MyGolfModClient implements ClientModInitializer {
         ColorProviderRegistry.BLOCK.register(
                 (state, view, pos, tintIndex) -> view != null ? BiomeColors.getGrassColor(view, pos) : GrassColors.getColor(0.5D, 1.0D),
                 RegisterBlocks.GOLF_HOLE
+        );
+
+        ColorProviderRegistry.ITEM.register(
+                (stack, tintIndex) -> {
+                    // tintIndex == 0 applies color to the primary layer (#0 in the model JSON)
+                    if (tintIndex == 0 && stack.getItem() instanceof DyeableItem dyeable) {
+                        return dyeable.getColor(stack);
+                    }
+                    return 0xFFFFFF; // Default fallback (White)
+                },
+                RegisterItems.GOLF_BALL
         );
 
         HandledScreens.register(FLAGSTICK_SCREEN_HANDLER, FlagstickScreen::new);

@@ -3,6 +3,7 @@ package net.fabricmc.mygolf.blocks;
 import net.fabricmc.mygolf.blockEntity.FlagstickEntity;
 import net.fabricmc.mygolf.blocks.base.BaseBlockWithEntity;
 import net.fabricmc.mygolf.registry.RegisterBlocks;
+import net.fabricmc.mygolf.registry.RegisterItems;
 import net.minecraft.block.*;
 import net.minecraft.block.entity.BlockEntity;
 import net.minecraft.block.piston.PistonBehavior;
@@ -31,25 +32,27 @@ import net.minecraft.world.World;
 import net.minecraft.world.WorldView;
 import org.jetbrains.annotations.Nullable;
 
-public class Flagstick extends BaseBlockWithEntity {
+public class FlagstickBlock extends BaseBlockWithEntity {
     static int maxCount = 1;    //最大堆叠数量
     public static final IntProperty ROTATION;
     protected static final VoxelShape SHAPE;
 
     static {
         ROTATION = Properties.ROTATION;
-        SHAPE = VoxelShapes.cuboid(0.375F, -1F, 0.375F, 0.625F, 2F, 0.625F);
+        SHAPE = VoxelShapes.cuboid(0.4375, -1F, 0.4375, 0.5625, 2F, 0.5625);
     }
 
-    public Flagstick(Settings settings) {
+    public FlagstickBlock(Settings settings) {
         super(settings);
         this.setDefaultState(this.stateManager.getDefaultState().with(ROTATION, 0));
     }
 
     //默认设置
-    public static Flagstick defaultInstance() {
-        return new Flagstick(
-                AbstractBlock.Settings.copy(Blocks.STONE)
+    public static FlagstickBlock defaultInstance() {
+        return new FlagstickBlock(
+                AbstractBlock.Settings
+                        .copy(Blocks.STONE)
+                        .pistonBehavior(PistonBehavior.DESTROY)
         );
     }
 
@@ -60,10 +63,6 @@ public class Flagstick extends BaseBlockWithEntity {
     @Override
     public VoxelShape getOutlineShape(BlockState state, BlockView view, BlockPos pos, ShapeContext context) {
         return SHAPE;
-    }
-
-    public boolean canMobSpawnInside() {
-        return true;
     }
 
     @Override
@@ -77,7 +76,7 @@ public class Flagstick extends BaseBlockWithEntity {
             player.sendMessage(Text.of("这是一个红旗杆，用力插吧!"), false);
         }
 
-        return ActionResult.SUCCESS;
+        return ActionResult.PASS;
     }
 
     @Override
@@ -96,7 +95,6 @@ public class Flagstick extends BaseBlockWithEntity {
                     if (downBlockState.isOf(RegisterBlocks.GOLF_HOLE)) {
                         world.breakBlock(downBlockPos, false);
                     }
-                    this.dropStack(world, pos, new ItemStack(RegisterBlocks.FLAGSTICK));
                 }
                 world.updateComparators(pos, this);
             }
@@ -105,19 +103,27 @@ public class Flagstick extends BaseBlockWithEntity {
     }
 
     @Override
+    public void onBreak(World world, BlockPos pos, BlockState state, PlayerEntity player) {
+        if (!world.isClient && !player.isCreative()) {
+            dropStack(world, pos, new ItemStack(RegisterItems.FLAGSTICK_ITEM));
+        }
+
+        super.onBreak(world, pos, state, player);
+    }
+
+    @Override
     public boolean canPlaceAt(BlockState state, WorldView world, BlockPos pos) {
         BlockPos downBlockPos = pos.down();
+        BlockPos upBlockPos = pos.up();
         BlockState downBlockState = world.getBlockState(downBlockPos);
-        return downBlockState.isIn(BlockTags.DIRT) || downBlockState.isOf(Blocks.FARMLAND);
+        BlockState upBlockState = world.getBlockState(upBlockPos);
+        // Place when air on top, dirt or farmland below
+        return upBlockState.isAir() && downBlockState.isIn(BlockTags.DIRT) || downBlockState.isOf(Blocks.FARMLAND);
     }
 
     @Override
     public BlockState getPlacementState(ItemPlacementContext ctx) {
         return this.getDefaultState().with(ROTATION, MathHelper.floor((double) (ctx.getPlayerYaw() * 16.0F / 360.0F) + 0.5) & 15);
-    }
-
-    public PistonBehavior getPistonBehavior(BlockState state) {
-        return PistonBehavior.DESTROY;
     }
 
     @Override
@@ -128,6 +134,11 @@ public class Flagstick extends BaseBlockWithEntity {
     @Override
     public BlockState mirror(BlockState state, BlockMirror mirror) {
         return state.with(ROTATION, mirror.mirror(state.get(ROTATION), 16));
+    }
+
+    @Override
+    public ItemStack getPickStack(BlockView world, BlockPos pos, BlockState state) {
+        return new ItemStack(RegisterItems.FLAGSTICK_ITEM);
     }
 
     @Override

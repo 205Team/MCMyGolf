@@ -6,130 +6,229 @@ import net.fabricmc.mygolf.MyGolfModClient;
 import net.fabricmc.mygolf.entity.GolfBallEntity;
 import net.fabricmc.mygolf.entity.model.GolfBallEntityModel;
 import net.fabricmc.mygolf.global.CommonStr;
+import net.fabricmc.mygolf.items.GolfClubItem;
+import net.fabricmc.mygolf.physics.GolfPhysicsEngine;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.font.TextRenderer;
+import net.minecraft.client.network.ClientPlayerEntity;
 import net.minecraft.client.render.*;
 import net.minecraft.client.render.block.entity.BeaconBlockEntityRenderer;
 import net.minecraft.client.render.entity.EntityRenderer;
 import net.minecraft.client.render.entity.EntityRendererFactory;
 import net.minecraft.client.util.math.MatrixStack;
+import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.item.ItemStack;
+import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
+import net.minecraft.util.math.MathHelper;
+import net.minecraft.util.math.RotationAxis;
 import net.minecraft.util.math.Vec3d;
 import org.joml.Matrix4f;
 import org.joml.Quaternionf;
 
+import java.util.ArrayList;
+import java.util.List;
+
 @Environment(EnvType.CLIENT)
 public class GolfBallEntityRenderer extends EntityRenderer<GolfBallEntity> {
     private final GolfBallEntityModel model;
-    private static final Identifier BEACON_BEAM_TEXTURE = new Identifier("minecraft", "textures/entity/beacon_beam.png");
+    public static final Identifier BLANK_BEAM_TEXTURE = new Identifier(CommonStr.modId, "textures/entity/blank_beam.png");
+    private static final int MAX_TOTAL_SPHERES = 60;    // Cap maximum total sphere draw calls per entity frame
+    private static final double SLOW_SPEED_THRESHOLD_SQ = 0.1 * 0.1; // Ball speed upper limit for beam rendering
 
     public GolfBallEntityRenderer(EntityRendererFactory.Context context) {
         super(context);
         this.model = new GolfBallEntityModel(context.getPart(MyGolfModClient.MODEL_CUBE_LAYER));
-        this.shadowRadius = 0.2f;
+        this.shadowRadius = 0.15F;
     }
 
     public void render(GolfBallEntity ballEntity, float yaw, float tickDelta, MatrixStack matrixStack, VertexConsumerProvider vertexConsumers, int light) {
-        super.render(ballEntity, yaw, tickDelta, matrixStack, vertexConsumers, light);
+        // Render trail first
+        renderTrail(ballEntity, tickDelta, matrixStack, vertexConsumers, light);
 
         MinecraftClient client = MinecraftClient.getInstance();
         if (client.player == null) return;
 
-        // 1. Render ball model
+        // Render trajectory preview while charging club
+        renderTrajectoryPreview(ballEntity, client.player, tickDelta, matrixStack, vertexConsumers, light);
+
+        matrixStack.push();
+
+        // Render ball jumping animation
+        renderJumpy(ballEntity, tickDelta, matrixStack, vertexConsumers, light);
+
+        // Render ball model
         renderModel(ballEntity, tickDelta, matrixStack, vertexConsumers, light);
 
-        // 2. Render Vanishing Trail Ribbon (Option 2)
-        renderTrail(ballEntity, tickDelta, matrixStack, vertexConsumers);
+        matrixStack.pop();
 
-        // 3. Render arrow or beam
+        // Render arrow or beam
         double distanceSq = client.player.squaredDistanceTo(ballEntity);
-        double minDistanceSq = 6.0 * 6.0;   // 10 blocks
-        double maxDistanceSq = 256.0 * 256.0; // 256 blocks
 
-        if (distanceSq <= minDistanceSq) {
-            renderArrow(ballEntity, matrixStack, vertexConsumers, light);
-        } else if (distanceSq <= maxDistanceSq)
-            renderBeaconBeam(ballEntity, tickDelta, matrixStack, vertexConsumers);
+        if (distanceSq <= GolfBallEntity.MIN_DISTANCE_SQ) {
+        } else if (distanceSq <= GolfBallEntity.MID_DISTANCE_SQ) {
+            renderArrow(ballEntity, matrixStack, vertexConsumers, light, tickDelta);
+        } else if (distanceSq <= GolfBallEntity.MAX_DISTANCE_SQ) {
+            if (ballEntity.getVelocity().lengthSquared() <= SLOW_SPEED_THRESHOLD_SQ) {
+                renderBeaconBeam(ballEntity, tickDelta, matrixStack, vertexConsumers);
+            }
+        }
 
+        // Super
+        super.render(ballEntity, yaw, tickDelta, matrixStack, vertexConsumers, light);
     }
 
     private void renderModel(GolfBallEntity ballEntity, float tickDelta, MatrixStack matrixStack, VertexConsumerProvider vertexConsumers, int light) {
+        float radius = GolfBallEntity.BALL_HEIGHT / 2;
+
+        matrixStack.translate(0.0D, radius, 0.0D);
+
         Quaternionf rotation = ballEntity.getPhysicsRotation(tickDelta);
-        matrixStack.push();
         matrixStack.multiply(rotation);
 
-        VertexConsumer vertexConsumer = vertexConsumers.getBuffer(model.getLayer(this.getTexture(ballEntity)));
-        model.render(matrixStack, vertexConsumer, light, OverlayTexture.DEFAULT_UV, 1.0F, 1.0F, 1.0F, 1.0F);
+        int colorInt = ballEntity.getColor();
+        float red   = (float) (colorInt >> 16 & 255) / 255.0F;
+        float green = (float) (colorInt >> 8 & 255)  / 255.0F;
+        float blue  = (float) (colorInt & 255)       / 255.0F;
 
-        matrixStack.pop();
+        VertexConsumer vertexConsumer = vertexConsumers.getBuffer(model.getLayer(this.getTexture(ballEntity)));
+        model.render(matrixStack, vertexConsumer, light, OverlayTexture.DEFAULT_UV, red, green, blue, 1.0F);
     }
 
-    private void renderTrail(GolfBallEntity entity, float tickDelta, MatrixStack matrices, VertexConsumerProvider vertexConsumers) {
-        if (entity.trailPositions.size() < 2) return;
+    private void renderJumpy(GolfBallEntity ballEntity, float tickDelta, MatrixStack matrixStack, VertexConsumerProvider vertexConsumers, int light) {
 
-        // Line buffer layer
-        VertexConsumer buffer = vertexConsumers.getBuffer(RenderLayer.getLeash());
+        // Render dynamic hop arc scaled by current hop height
+        float remainingTicks = Math.max(0.0F, (float) ballEntity.getJumpTicks() - tickDelta);
+        if (remainingTicks > 0.0F) {
+            float totalDuration = 8.0F;
+            float progress = 1.0F - (remainingTicks / totalDuration);
 
-        // Interpolate visual position to offset world coordinates relative to matrixStack origin
-        Vec3d entityPos = entity.getLerpedPos(tickDelta);
+            // Dynamically scale peak height using hopHeight (0.125m -> 0.25m -> 0.375m)
+            float maxHop = ballEntity.getHopHeight();
+            float yOffset = MathHelper.sin(progress * (float) Math.PI) * maxHop;
 
-        matrices.push();
-        Matrix4f matrix = matrices.peek().getPositionMatrix();
-
-        for (int i = 0; i < entity.trailPositions.size() - 1; i++) {
-            Vec3d current = entity.trailPositions.get(i).subtract(entityPos);
-            Vec3d next = entity.trailPositions.get(i + 1).subtract(entityPos);
-
-            // Calculate fading alpha from 1.0 (head) to 0.0 (tail)
-            float alpha = 1.0f - ((float) i / entity.trailPositions.size());
-
-            // Draw line segment
-            buffer.vertex(matrix, (float) current.x, (float) current.y + 0.05f, (float) current.z)
-                    .color(1.0f, 1.0f, 1.0f, alpha)
-                    .light(255)
-                    .next();
-
-            buffer.vertex(matrix, (float) next.x, (float) next.y + 0.05f, (float) next.z)
-                    .color(1.0f, 1.0f, 1.0f, alpha)
-                    .light(255)
-                    .next();
+            matrixStack.translate(0.0D, yOffset, 0.0D);
         }
 
-        matrices.pop();
     }
 
-    private void renderArrow(GolfBallEntity entity, MatrixStack matrices, VertexConsumerProvider vertexConsumers, int light) {
+    private void renderTrail(GolfBallEntity entity, float tickDelta, MatrixStack matrices, VertexConsumerProvider vertexConsumers, int light) {
+        if (entity.trailPositions.isEmpty()) return;
+
+        // Use translucent entity layer so alpha transparency works
+        VertexConsumer buffer = vertexConsumers.getBuffer(RenderLayer.getEntityTranslucent(this.getTexture(entity)));
+        Vec3d entityPos = entity.getLerpedPos(tickDelta);
+
+        List<Vec3d> keyframes = new ArrayList<>();
+        keyframes.add(entityPos);
+        keyframes.addAll(entity.trailPositions);
+
+        // Calculate total distance across all keyframes
+        double totalDistance = 0.0;
+        for (int i = 0; i < keyframes.size() - 1; i++) {
+            totalDistance += keyframes.get(i).distanceTo(keyframes.get(i + 1));
+        }
+        if (totalDistance <= 0.001) return;
+        // Determine effective step size: expands stepSize if distance > MAX_TOTAL_SPHERES * baseStepSize
+        double baseStepSize = 0.12;
+        double effectiveStepSize = Math.max(baseStepSize, totalDistance / MAX_TOTAL_SPHERES);
+
+        // Extract dye color components
+        int color = entity.getColor();
+        float red = ((color >> 16) & 0xFF) / 255.0F;
+        float green = ((color >> 8) & 0xFF) / 255.0F;
+        float blue = (color & 0xFF) / 255.0F;
+
+        int totalSegments = keyframes.size() - 1;
+        int renderedSpheres = 0; // Hard safety counter
+
+        for (int i = 0; i < totalSegments; i++) {
+            Vec3d start = keyframes.get(i);
+            Vec3d end = keyframes.get(i + 1);
+
+            double distance = start.distanceTo(end);
+            // Determine how many sub-spheres are needed to bridge this segment without gaps
+            int steps = Math.max(1, (int) Math.ceil(distance / effectiveStepSize));
+
+            for (int step = 0; step < steps; step++) {
+                // Absolute safety break
+                if (renderedSpheres >= MAX_TOTAL_SPHERES) return;
+
+                double t = (double) step / steps;
+
+                // Linearly interpolate between start and end
+                Vec3d interpolatedPos = start.lerp(end, t);
+                Vec3d offset = interpolatedPos.subtract(entityPos);
+
+                // Calculate overall progress along the full trail length (0.0 = head, 1.0 = tail)
+                double globalProgress = ((double) i + t) / totalSegments;
+                float alpha = (float) (1.0 - globalProgress) * 0.6F; // Fades out over 0.2s
+
+                matrices.push();
+                matrices.translate(offset.x, offset.y, offset.z);
+
+                // Render seamless sub-sphere
+                this.model.render(matrices, buffer, light, OverlayTexture.DEFAULT_UV, red, green, blue, alpha);
+
+                matrices.pop();
+                renderedSpheres++;
+            }
+        }
+    }
+
+    private void renderArrow(GolfBallEntity entity, MatrixStack matrices, VertexConsumerProvider vertexConsumers, int light, float tickDelta) {
         matrices.push();
 
-        // Translate above the ball (unaffected by ball spin)
-        double offsetY = entity.getHeight() + 0.35D;
+        // 1. Translate above the ball in world space
+        double offsetY = entity.getHeight() + 0.25D + Math.sin((entity.age + tickDelta) * 0.18D) * 0.1D;
         matrices.translate(0.0D, offsetY, 0.0D);
 
-        // Billboard toward player camera
-        matrices.multiply(this.dispatcher.getRotation());
+        // 2. Continuous rotation on Y-axis
+        float animationAngle = (entity.age + tickDelta) * 4.0F;
+        matrices.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(animationAngle));
 
-        // Scale down world-space text
-        float scale = 0.025F;
-        matrices.scale(-scale, -scale, scale);
+        // 3. Setup VertexConsumer
+        VertexConsumer buffer = vertexConsumers.getBuffer(RenderLayer.getDebugQuads());
+        Matrix4f posMatrix = matrices.peek().getPositionMatrix();
 
-        TextRenderer textRenderer = this.getTextRenderer();
-        String arrowStr = "▲";
-        float xOffset = -textRenderer.getWidth(arrowStr) / 2.0F;
+        float radius = 0.12F;
+        float height = 0.18F;
+        int segments = 6; // Increase for smoother cone, decrease for performance/blocky style
+        int r = 255, g = 40, b = 40, a = 255; // Red color
 
-        Matrix4f positionMatrix = matrices.peek().getPositionMatrix();
+        // 4. Render Cone Side Walls (Tip at 0,0,0 pointing DOWN)
+        for (int i = 0; i < segments; i++) {
+            double angle1 = (2 * Math.PI / segments) * i;
+            double angle2 = (2 * Math.PI / segments) * (i + 1);
 
-        textRenderer.draw(
-                arrowStr,
-                xOffset,
-                0,
-                0xFFFF00, // Yellow (RGB)
-                false,
-                positionMatrix,
-                vertexConsumers,
-                TextRenderer.TextLayerType.NORMAL,
-                0,
-                light
-        );
+            float x1 = (float) (Math.cos(angle1) * radius);
+            float z1 = (float) (Math.sin(angle1) * radius);
+            float x2 = (float) (Math.cos(angle2) * radius);
+            float z2 = (float) (Math.sin(angle2) * radius);
+
+            // Tip -> Point 1 -> Point 2 -> Point 2 (Duplicated 4th vertex for quad buffer)
+            buffer.vertex(posMatrix, 0, 0, 0).color(r, g, b, a).next();
+            buffer.vertex(posMatrix, x1, height, z1).color(r, g, b, a).next();
+            buffer.vertex(posMatrix, x2, height, z2).color(r, g, b, a).next();
+            buffer.vertex(posMatrix, x2, height, z2).color(r, g, b, a).next();
+        }
+
+        // 5. Render Top Circular Cap
+        for (int i = 0; i < segments; i++) {
+            double angle1 = (2 * Math.PI / segments) * i;
+            double angle2 = (2 * Math.PI / segments) * (i + 1);
+
+            float x1 = (float) (Math.cos(angle1) * radius);
+            float z1 = (float) (Math.sin(angle1) * radius);
+            float x2 = (float) (Math.cos(angle2) * radius);
+            float z2 = (float) (Math.sin(angle2) * radius);
+
+            // Center -> Point 2 -> Point 1 -> Point 1
+            buffer.vertex(posMatrix, 0, height, 0).color(r, g, b, a).next();
+            buffer.vertex(posMatrix, x2, height, z2).color(r, g, b, a).next();
+            buffer.vertex(posMatrix, x1, height, z1).color(r, g, b, a).next();
+            buffer.vertex(posMatrix, x1, height, z1).color(r, g, b, a).next();
+        }
 
         matrices.pop();
     }
@@ -138,28 +237,106 @@ public class GolfBallEntityRenderer extends EntityRenderer<GolfBallEntity> {
         // RGB Color values (float 0.0f - 1.0f) -> e.g. White: {1.0f, 1.0f, 1.0f}, Red: {1.0f, 0.2f, 0.2f}
         float[] color = new float[]{1.0f, 1.0f, 1.0f};
         long time = entity.getWorld().getTime();
+        double heightOffset = GolfBallEntity.BALL_HEIGHT;
 
         matrices.push();
         // Center the beam over the ball
-        matrices.translate(-0.5, 0.0, -0.5);
+        matrices.translate(-0.5, heightOffset, -0.5);
 
         // Vanilla beacon beam helper
         BeaconBlockEntityRenderer.renderBeam(
                 matrices,
                 vertexConsumers,
-                BEACON_BEAM_TEXTURE,
+                BLANK_BEAM_TEXTURE,
                 tickDelta,
                 1.0F,                  // Height scale factor
                 time,                  // World time (animates beam movement)
                 0,                     // Y-offset starting height
                 256,                   // Total beam height (up to build limit)
                 color,
-                0.15F,                 // Inner beam radius
-                0.25F                  // Outer beam radius
+                0.07F,                 // Inner beam radius
+                0.18F                  // Outer beam radius
         );
 
         matrices.pop();
     }
+
+    private void renderTrajectoryPreview(GolfBallEntity ballEntity, PlayerEntity player, float tickDelta, MatrixStack matrixStack, VertexConsumerProvider vertexConsumers, int light) {
+        // Check if player is actively holding/charging an item
+        if (!player.isUsingItem()) return;
+
+        ItemStack activeStack = player.getActiveItem();
+        if (!(activeStack.getItem() instanceof GolfClubItem)) return;
+
+        // Verify this entity is the closest ball to the player
+        GolfBallEntity closestBall = GolfBallEntity.getClosestBall(player.getWorld(), player, GolfBallEntity.MIN_RADIUS);
+        if (closestBall != ballEntity) return;
+
+        // Calculate charge power ratio
+        int heldTicks = activeStack.getMaxUseTime() - player.getItemUseTimeLeft();
+        float powerRatio = Math.min(1.0f, (float) heldTicks / GolfClubItem.MAX_CHARGE_TICKS);
+
+        // Require minimum threshold before showing prediction arc
+        if (powerRatio < 0.1f) return;
+
+        // --- PHYSICS SIMULATION ---
+        float currentLoft = GolfClubItem.getSelectedLoft(activeStack);
+        Vec3d launchDir = Vec3d.fromPolar(currentLoft, player.getYaw());
+        double finalSpeed = powerRatio * GolfClubItem.MAX_SHOT_POWER;
+        Vec3d impulse = launchDir.multiply(finalSpeed);
+        Vec3d initialVelocity = GolfPhysicsEngine.applyImpulse(
+                ballEntity.getVelocity(),
+                impulse,
+                GolfPhysicsEngine.Config.STANDARD_BALL.mass()
+        );
+
+        Vec3d initialSpin = Vec3d.ZERO;
+        if (GolfBallEntity.ENABLE_MAGNUS_EFFECT) {
+            float yawRad = (float) Math.toRadians(player.getYaw());
+            double loftMagnitude = Math.abs(currentLoft);
+            double backspinIntensity = finalSpeed * Math.sin(Math.toRadians(loftMagnitude)) * 0.15;
+            initialSpin = new Vec3d(-Math.cos(yawRad) * backspinIntensity, 0.0, -Math.sin(yawRad) * backspinIntensity);
+        }
+
+        List<Vec3d> trajectoryPoints = GolfPhysicsEngine.predictTrajectory(
+                player.getWorld(),
+                ballEntity,
+                ballEntity.getLerpedPos(tickDelta),
+                initialVelocity,
+                initialSpin,
+                GolfPhysicsEngine.Config.STANDARD_BALL,
+                20
+        );
+
+        // --- SPHERE RENDERING ---
+        VertexConsumer buffer = vertexConsumers.getBuffer(RenderLayer.getEntityTranslucent(this.getTexture(ballEntity)));
+        Vec3d entityPos = ballEntity.getLerpedPos(tickDelta);
+
+        int color = ballEntity.getColor();
+        float red = ((color >> 16) & 0xFF) / 255.0F;
+        float green = ((color >> 8) & 0xFF) / 255.0F;
+        float blue = (color & 0xFF) / 255.0F;
+
+        float radius = GolfBallEntity.BALL_HEIGHT / 2.0f;
+        int totalPoints = trajectoryPoints.size();
+
+        for (int i = 1; i < totalPoints; i++) {
+            Vec3d point = trajectoryPoints.get(i);
+            Vec3d offset = point.subtract(entityPos);
+
+            float progress = (float) i / totalPoints;
+            float alpha = (1.0F - progress) * 0.6F;
+
+            matrixStack.push();
+            matrixStack.translate(offset.x, offset.y + radius, offset.z);
+            matrixStack.scale(0.3F, 0.3F, 0.3F);
+
+            this.model.render(matrixStack, buffer, 0xF000F0, OverlayTexture.DEFAULT_UV, red, green, blue, alpha);
+
+            matrixStack.pop();
+        }
+    }
+
 
     @Override
     public boolean shouldRender(GolfBallEntity entity, Frustum frustum, double d, double e, double f) {
@@ -169,5 +346,74 @@ public class GolfBallEntityRenderer extends EntityRenderer<GolfBallEntity> {
     @Override
     public Identifier getTexture(GolfBallEntity entity) {
         return new Identifier(CommonStr.modId, "textures/entity/cube/golf_ball.png");
+    }
+
+    @Override
+    protected boolean hasLabel(GolfBallEntity entity) {
+        MinecraftClient client = MinecraftClient.getInstance();
+        ClientPlayerEntity player = client.player;
+
+        if (player == null) {
+            return false;
+        }
+
+        boolean isCharging = player.isUsingItem() && player.getActiveItem().getItem() instanceof GolfClubItem;
+        if (isCharging) {
+            return false;
+        }
+
+        GolfBallEntity closestBall = GolfBallEntity.getClosestBall(
+                player.getWorld(),
+                player,
+                GolfBallEntity.MIN_RADIUS
+        );
+
+        return entity == closestBall;
+    }
+
+    @Override
+    protected void renderLabelIfPresent(GolfBallEntity entity, Text text, MatrixStack matrices, VertexConsumerProvider vertexConsumers, int light) {
+        double squaredDistance = this.dispatcher.getSquaredDistanceToCamera(entity);
+        if (squaredDistance > 4096.0D) {
+            return;
+        }
+
+        matrices.push();
+
+        // Position label height above the ball
+        double offsetY = entity.getHeight() + 0.3D;
+        matrices.translate(0.0D, entity.getNameLabelHeight(), 0.0D);
+
+        matrices.multiply(this.dispatcher.getRotation());
+
+        matrices.translate(0.0D, 0.0D, -0.05D);
+
+        // Custom text scale (Vanilla default is -0.025F)
+        float scale = -0.015F;
+        matrices.scale(scale, scale, Math.abs(scale));
+
+        Matrix4f matrix4f = matrices.peek().getPositionMatrix();
+
+        float backgroundAlpha = MinecraftClient.getInstance().options.getTextBackgroundOpacity(0.25F);
+        int backgroundColor = (int) (backgroundAlpha * 255.0F) << 24;
+
+        TextRenderer textRenderer = this.getTextRenderer();
+        float xOffset = -textRenderer.getWidth(text) / 2.0F;
+
+        // 4. Render label text
+        textRenderer.draw(
+                text,
+                xOffset,
+                0,
+                0xFFFFFFFF, // White text with full opacity
+                false,
+                matrix4f,
+                vertexConsumers,
+                TextRenderer.TextLayerType.SEE_THROUGH,
+                backgroundColor,
+                light
+        );
+
+        matrices.pop();
     }
 }

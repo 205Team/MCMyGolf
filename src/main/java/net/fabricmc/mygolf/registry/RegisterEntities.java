@@ -15,7 +15,7 @@ public class RegisterEntities {
             Registries.ENTITY_TYPE,
             new Identifier(CommonStr.modId, "golf_ball_entity"),
             FabricEntityTypeBuilder.create(SpawnGroup.MISC, GolfBallEntity::new)
-                    .dimensions(EntityDimensions.fixed(0.25f, 0.25f)) // Small collision box for golf ball
+                    .dimensions(EntityDimensions.fixed(GolfBallEntity.BALL_DIMENSIONS.width, GolfBallEntity.BALL_DIMENSIONS.height)) // Small collision box for golf ball
                     .trackRangeBlocks(256)                             // Network sync range
                     .trackedUpdateRate(1)                              // Update every tick for smooth physics
                     .build()

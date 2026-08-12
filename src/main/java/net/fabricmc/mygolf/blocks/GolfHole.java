@@ -3,10 +3,7 @@ package net.fabricmc.mygolf.blocks;
 import net.fabricmc.mygolf.blockEntity.GolfHoleEntity;
 import net.fabricmc.mygolf.blocks.base.BaseBlock;
 import net.fabricmc.mygolf.registry.RegisterBlocks;
-import net.minecraft.block.AbstractBlock;
-import net.minecraft.block.BlockState;
-import net.minecraft.block.Blocks;
-import net.minecraft.block.ShapeContext;
+import net.minecraft.block.*;
 import net.minecraft.block.entity.BlockEntity;
 import net.minecraft.block.piston.PistonBehavior;
 import net.minecraft.entity.ai.pathing.NavigationType;
@@ -27,13 +24,12 @@ import net.minecraft.world.World;
 
 public class GolfHole extends BaseBlock {
 
-    protected static final VoxelShape OUTLINE_SHAPE;
-    private static final VoxelShape RAYCAST_SHAPE;
+    protected static final VoxelShape HOLE_SHAPE;
+    private static final VoxelShape CUTOUT_SHAPE;
 
     static {
-        RAYCAST_SHAPE = VoxelShapes.union(createCuboidShape(2.0, 2.0, 2.0, 14.0, 16.0, 14.0), new VoxelShape[]{createCuboidShape(1.0, 2.0, 3.0, 15.0, 16.0, 13.0), createCuboidShape(3.0, 2.0, 1.0, 13.0, 16.0, 15.0)});
-        //createCuboidShape(2.0, 2.0, 2.0, 14.0, 16.0, 14.0);
-        OUTLINE_SHAPE = VoxelShapes.combineAndSimplify(VoxelShapes.fullCube(), RAYCAST_SHAPE, BooleanBiFunction.ONLY_FIRST);
+        CUTOUT_SHAPE = Block.createCuboidShape(2.0, 2.0, 2.0, 14.0, 16.0, 14.0);
+        HOLE_SHAPE = VoxelShapes.combineAndSimplify(VoxelShapes.fullCube(), CUTOUT_SHAPE, BooleanBiFunction.ONLY_FIRST);
     }
 
     public GolfHole(AbstractBlock.Settings settings) {
@@ -59,19 +55,17 @@ public class GolfHole extends BaseBlock {
 
     @Override
     public VoxelShape getOutlineShape(BlockState state, BlockView world, BlockPos pos, ShapeContext context) {
-        return OUTLINE_SHAPE;
+        return HOLE_SHAPE;
     }
 
     @Override
     public VoxelShape getRaycastShape(BlockState state, BlockView world, BlockPos pos) {
-        return RAYCAST_SHAPE;
+        return HOLE_SHAPE;
     }
 
     @Override
     public VoxelShape getCollisionShape(BlockState state, BlockView world, BlockPos pos, ShapeContext context) {
-        // Return VoxelShapes.empty() if you want the ball to roll straight through without hitting any collision top,
-        // OR return a custom hollow shape (with walls/bottom) so the ball physically rests inside the cup.
-        return RAYCAST_SHAPE;
+        return HOLE_SHAPE;
     }
 
     //生物不可寻路通过
@@ -86,7 +80,7 @@ public class GolfHole extends BaseBlock {
             if (world instanceof ServerWorld) {
                 BlockPos upBlockPos = pos.up();
                 BlockState upBlockState = world.getBlockState(upBlockPos);
-                if (upBlockState.isOf(RegisterBlocks.FLAGSTICK)) {
+                if (upBlockState.isOf(RegisterBlocks.FLAGSTICK_BLOCK)) {
                     world.breakBlock(upBlockPos, false);
                 }
             }
@@ -108,7 +102,7 @@ public class GolfHole extends BaseBlock {
             //This will call the createScreenHandlerFactory method from BlockWithEntity, which will return our blockEntity cast to
             //a namedScreenHandlerFactory. If your block class does not extend BlockWithEntity, it needs to implement createScreenHandlerFactory.
             BlockState upBlockState = world.getBlockState(pos.up());
-            if (upBlockState.isOf(RegisterBlocks.FLAGSTICK)) {
+            if (upBlockState.isOf(RegisterBlocks.FLAGSTICK_BLOCK)) {
                 NamedScreenHandlerFactory screenHandlerFactory = upBlockState.createScreenHandlerFactory(world, pos);
 
                 if (screenHandlerFactory != null) {
@@ -117,7 +111,7 @@ public class GolfHole extends BaseBlock {
                 }
             }
         }
-        return ActionResult.SUCCESS;
+        return ActionResult.PASS;
     }
 
 }

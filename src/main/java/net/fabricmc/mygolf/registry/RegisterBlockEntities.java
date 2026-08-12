@@ -16,7 +16,7 @@ public class RegisterBlockEntities {
         FLAGSTICK_ENTITY = Registry.register(
                 Registries.BLOCK_ENTITY_TYPE,
                 new Identifier(CommonStr.modId, "flagstick_entity"),
-                FabricBlockEntityTypeBuilder.create(FlagstickEntity::new, RegisterBlocks.FLAGSTICK).build()
+                FabricBlockEntityTypeBuilder.create(FlagstickEntity::new, RegisterBlocks.FLAGSTICK_BLOCK).build()
         );
     }
 

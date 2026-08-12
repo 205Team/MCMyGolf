@@ -5,7 +5,7 @@ import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.fabricmc.mygolf.MyGolfModClient;
 import net.fabricmc.mygolf.blockEntity.FlagstickEntity;
-import net.fabricmc.mygolf.blocks.Flagstick;
+import net.fabricmc.mygolf.blocks.FlagstickBlock;
 import net.fabricmc.mygolf.global.CommonStr;
 import net.minecraft.block.BlockState;
 import net.minecraft.client.model.*;
@@ -22,7 +22,7 @@ import net.minecraft.util.math.RotationAxis;
 
 @Environment(EnvType.CLIENT)
 public class FlagstickEntityRenderer implements BlockEntityRenderer<FlagstickEntity> {
-    private static final Identifier textureID = new Identifier(CommonStr.modId, "textures/block/flagstick.png");
+    private static final Identifier textureID = new Identifier(CommonStr.modId, "textures/block/flagstick_block.png");
     public final ModelPart ironStick;
     public final ModelPart flag;
     public FlagstickEntityRenderer(BlockEntityRendererFactory.Context ctx) {
@@ -38,7 +38,7 @@ public class FlagstickEntityRenderer implements BlockEntityRenderer<FlagstickEnt
 
         matrices.push();
         matrices.translate(0.5, 0.0, 0.5);
-        float rotation = -((float) (blockState.get(Flagstick.ROTATION) * 360) / 16.0F);
+        float rotation = -((float) (blockState.get(FlagstickBlock.ROTATION) * 360) / 16.0F);
         matrices.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(rotation));
         this.ironStick.render(matrices, vertexConsumer, light, overlay);
 
@@ -58,10 +58,10 @@ public class FlagstickEntityRenderer implements BlockEntityRenderer<FlagstickEnt
         ModelData modelData = new ModelData();
         ModelPartData modelPartData = modelData.getRoot();
         modelPartData.addChild("iron_stick",
-                ModelPartBuilder.create().uv(0, 0).cuboid(-1.0F, -14.0F, -1.0F, 2.0F, 46.0F, 2.0F),
+                ModelPartBuilder.create().uv(0, 0).cuboid(-0.5F, -14.0F, -0.5F, 1.0F, 46.0F, 1.0F),
                 ModelTransform.NONE);
         modelPartData.addChild("flag",
-                ModelPartBuilder.create().uv(8, 0).cuboid(-8.0F, 26.0F, -0.5F, 7.0F, 6.0F, 1.0F),
+                ModelPartBuilder.create().uv(8, 0).cuboid(-6.5F, 26.0F, -0.5F, 6.0F, 6.0F, 1.0F),
                 ModelTransform.NONE);
         return TexturedModelData.of(modelData, 64, 64);
     }
