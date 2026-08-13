@@ -30,8 +30,8 @@ public class GolfClubItem extends Item implements ItemAbstract {
 
     public static final float[] LOFT_PRESETS = { -5.0f, -15.0f, -30.0f, -45.0f, -60.0f, -75.0f };   // Preset loft angles (Negative pitch = UP in Minecraft)
     private static final int MAX_USE_TIME = 72000; // 定义蓄力的最长时间，单位为 tick
-    public static final int MAX_CHARGE_TICKS = 30; // 1.5 seconds to reach 100% power
-    public static final double MAX_SHOT_POWER = 0.6; // Max speed multiplier
+    public static final int MAX_CHARGE_TICKS = 60; // * 0.05 seconds to reach 100% power
+    public static final double MAX_SHOT_POWER = 1.2; // Max speed multiplier
 
     public GolfClubItem(Item.Settings settings) {
         super(settings);
@@ -59,7 +59,7 @@ public class GolfClubItem extends Item implements ItemAbstract {
 
         // Mouse tap
         // [>---------]
-        if (heldTicks < 3) {
+        if (heldTicks < 5) {
             cycleLoftAngle(stack, player, world);
             return;
         }
@@ -70,7 +70,7 @@ public class GolfClubItem extends Item implements ItemAbstract {
 
             // Minimum shot threshold (prevents accidental misfires)
             // [->--------]
-            if (powerRatio < 0.1f) return;
+            if (powerRatio < 0.15f) return;
 
             // Find closest GolfBallEntity within 4 blocks of the player
             GolfBallEntity targetBall = GolfBallEntity.getClosestBall(world, player, GolfBallEntity.MIN_RADIUS);

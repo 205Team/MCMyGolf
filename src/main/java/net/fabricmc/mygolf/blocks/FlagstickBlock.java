@@ -53,6 +53,8 @@ public class FlagstickBlock extends BaseBlockWithEntity {
                 AbstractBlock.Settings
                         .copy(Blocks.STONE)
                         .pistonBehavior(PistonBehavior.DESTROY)
+                        .nonOpaque()
+                        .luminance(state ->15)
         );
     }
 
@@ -67,7 +69,7 @@ public class FlagstickBlock extends BaseBlockWithEntity {
 
     @Override
     public VoxelShape getCollisionShape(BlockState state, BlockView view, BlockPos pos, ShapeContext context) {
-        return VoxelShapes.empty();
+        return SHAPE;
     }
 
     @Override

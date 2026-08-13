@@ -35,6 +35,7 @@ public class GolfBallEntityRenderer extends EntityRenderer<GolfBallEntity> {
     public static final Identifier BLANK_BEAM_TEXTURE = new Identifier(CommonStr.modId, "textures/entity/blank_beam.png");
     private static final int MAX_TOTAL_SPHERES = 60;    // Cap maximum total sphere draw calls per entity frame
     private static final double SLOW_SPEED_THRESHOLD_SQ = 0.1 * 0.1; // Ball speed upper limit for beam rendering
+    private static final int MAX_TRAJECTORY_STEPS = 10; // Length of the trail
 
     public GolfBallEntityRenderer(EntityRendererFactory.Context context) {
         super(context);
@@ -234,8 +235,12 @@ public class GolfBallEntityRenderer extends EntityRenderer<GolfBallEntity> {
     }
 
     private void renderBeaconBeam(GolfBallEntity entity, float tickDelta, MatrixStack matrices, VertexConsumerProvider vertexConsumers) {
-        // RGB Color values (float 0.0f - 1.0f) -> e.g. White: {1.0f, 1.0f, 1.0f}, Red: {1.0f, 0.2f, 0.2f}
-        float[] color = new float[]{1.0f, 1.0f, 1.0f};
+        int rgb = entity.getColor();
+        float[] color = new float[] {
+                ((rgb >> 16) & 0xFF) / 255.0f, // Red
+                ((rgb >> 8) & 0xFF) / 255.0f,  // Green
+                (rgb & 0xFF) / 255.0f          // Blue
+        };
         long time = entity.getWorld().getTime();
         double heightOffset = GolfBallEntity.BALL_HEIGHT;
 
@@ -277,7 +282,7 @@ public class GolfBallEntityRenderer extends EntityRenderer<GolfBallEntity> {
         float powerRatio = Math.min(1.0f, (float) heldTicks / GolfClubItem.MAX_CHARGE_TICKS);
 
         // Require minimum threshold before showing prediction arc
-        if (powerRatio < 0.1f) return;
+        if (powerRatio < 0.15f) return;
 
         // --- PHYSICS SIMULATION ---
         float currentLoft = GolfClubItem.getSelectedLoft(activeStack);
@@ -305,7 +310,7 @@ public class GolfBallEntityRenderer extends EntityRenderer<GolfBallEntity> {
                 initialVelocity,
                 initialSpin,
                 GolfPhysicsEngine.Config.STANDARD_BALL,
-                20
+                MAX_TRAJECTORY_STEPS
         );
 
         // --- SPHERE RENDERING ---

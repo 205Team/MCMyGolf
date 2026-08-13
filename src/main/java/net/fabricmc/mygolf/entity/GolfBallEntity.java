@@ -145,7 +145,15 @@ public class GolfBallEntity extends Entity {
         this.setOnGround(newState.onGround());
         this.velocityModified = true;
 
-        // 4. Split side-specific logic (Visuals vs Server Management)
+        // 4. Jump animation handling
+        if (this.getJumpTicks() > 0) {
+            this.setJumpTicks(this.getJumpTicks() - 1);
+        }
+        if (this.isOnGround() && this.getJumpTicks() == 0) {
+            this.setHopHeight(0.0F);
+        }
+
+        // 5. Split side-specific logic (Visuals vs Server Management)
         if (this.getWorld().isClient()) {
             /**
              * Client-side Visuals
@@ -190,13 +198,6 @@ public class GolfBallEntity extends Entity {
             /**
              * Server-side Logic
              */
-            // Jump animation handling
-            if (this.getJumpTicks() > 0) {
-                this.setJumpTicks(this.getJumpTicks() - 1);
-            }
-            if (this.isOnGround() && this.getJumpTicks() == 0) {
-                this.setHopHeight(0.0F);
-            }
 
             // Chunk loading logic
             if (this.getWorld() instanceof ServerWorld serverWorld) {

@@ -103,9 +103,10 @@ public class GolfBallEntityEvents {
 
                     // 1. Pickup with Empty Hand
                     if (mainHandStack.isEmpty()) {
-                        if (!world.isClient()) {
+                        if (!world.isClient() && player.isInSneakingPose()) {
                             ball.discard();
                             ItemStack ballStack = new ItemStack(RegisterItems.GOLF_BALL);
+                            ballStack.getOrCreateNbt().putInt("HitCount", ball.getHitCount());
                             // Copy color tag to item if dyed
                             RegisterItems.GOLF_BALL.setColor(ballStack, ball.getColor());
                             player.setStackInHand(Hand.MAIN_HAND, ballStack);
@@ -115,7 +116,7 @@ public class GolfBallEntityEvents {
 
                     // 2. Pickup / Stack with Golf Ball
                     if (mainHandStack.isOf(RegisterItems.GOLF_BALL)) {
-                        if (!world.isClient()) {
+                        if (!world.isClient() && player.isInSneakingPose()) {
                             ball.discard();
                             if (!player.isCreative()) {
                                 if (mainHandStack.getCount() < mainHandStack.getMaxCount()) {

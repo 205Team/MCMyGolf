@@ -44,12 +44,18 @@ public class GolfBall extends BaseItem implements DyeableItem {
     ///添加物品提示
     @Override
     public void appendTooltip(ItemStack stack, @Nullable World world, List<Text> tooltip, TooltipContext context) {
+        int hits = 0;
+        if (stack.hasNbt() && stack.getNbt().contains("HitCount")) {
+            hits = stack.getNbt().getInt("HitCount");
+        }
+        if (hits > 0) {
+            tooltip.add(Text.literal("Hits: " + hits).formatted(Formatting.GOLD));
+        }
         super.appendTooltip(stack, world, tooltip, context);
-        // 默认为白色文本
         tooltip.add(Text.translatable("空手右键可回收").formatted(Formatting.GRAY));
     }
 
-    //右键生成golf ball测试
+    //Right click to spawn golf ball
     @Override
     public TypedActionResult<ItemStack> use(World level, PlayerEntity user, Hand hand) {
         final var itemStack = user.getStackInHand(hand);
@@ -88,6 +94,13 @@ public class GolfBall extends BaseItem implements DyeableItem {
             }
             // Apply the dyed item color to the spawned entity
             golfBallEntity.setColor(this.getColor(itemStack));
+
+            // Pass hitcount from itemStack ball to entity ball
+            int savedHits = 0;
+            if (itemStack.hasNbt() && itemStack.getNbt().contains("HitCount")) {
+                savedHits = itemStack.getNbt().getInt("HitCount");
+            }
+            golfBallEntity.setHitCount(savedHits);
 
             // Spawn ball
             level.spawnEntity(golfBallEntity);
