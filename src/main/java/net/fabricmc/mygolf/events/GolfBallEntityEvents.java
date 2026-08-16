@@ -95,20 +95,38 @@ public class GolfBallEntityEvents {
         //            return ActionResult.PASS; // Let vanilla handle other entity attacks
         //        });
 
-        // 2. RIGHT-CLICK (Pick Up Ball)
+        // 2. RIGHT-CLICK (Pick Up Ball, Entity → Item)
         UseEntityCallback.EVENT.register((player, world, hand, entity, hitResult) -> {
-            if (entity instanceof GolfBallEntity ball && !player.isSpectator()) {
+            if (entity instanceof GolfBallEntity ballEntity && !player.isSpectator()) {
                 if (hand == Hand.MAIN_HAND) {
                     ItemStack mainHandStack = player.getMainHandStack();
 
                     // 1. Pickup with Empty Hand
                     if (mainHandStack.isEmpty()) {
                         if (!world.isClient() && player.isInSneakingPose()) {
-                            ball.discard();
+                            ballEntity.discard();
                             ItemStack ballStack = new ItemStack(RegisterItems.GOLF_BALL);
-                            ballStack.getOrCreateNbt().putInt("HitCount", ball.getHitCount());
+
+                            // Pass name
+                            if (ballEntity.hasCustomName()) {
+                                ballStack.setCustomName(ballEntity.getCustomName());
+                            }
+                            // Pass isgoal
+                            if (ballEntity.isGoaled()) {
+                                ballStack.getOrCreateNbt().putBoolean("IsGoaled", true);
+                            }
+                            // Pass hitcount
+                            if (ballEntity.getHitCount() > 0) {
+                                ballStack.getOrCreateNbt().putInt("HitCount", ballEntity.getHitCount());
+                            }
                             // Copy color tag to item if dyed
-                            RegisterItems.GOLF_BALL.setColor(ballStack, ball.getColor());
+                            int ballColor = ballEntity.getColor();
+                            if (ballColor != -1 && ballColor != 0xFFFFFF && ballColor != 0xF9FFFE) {
+                                RegisterItems.GOLF_BALL.setColor(ballStack, ballColor);
+                            }
+                            // Wipe empty NBT compound
+                            GolfBall.sanitizeNbt(ballStack);
+
                             player.setStackInHand(Hand.MAIN_HAND, ballStack);
                         }
                         return ActionResult.SUCCESS;
@@ -117,13 +135,13 @@ public class GolfBallEntityEvents {
                     // 2. Pickup / Stack with Golf Ball
                     if (mainHandStack.isOf(RegisterItems.GOLF_BALL)) {
                         if (!world.isClient() && player.isInSneakingPose()) {
-                            ball.discard();
+                            ballEntity.discard();
                             if (!player.isCreative()) {
                                 if (mainHandStack.getCount() < mainHandStack.getMaxCount()) {
                                     mainHandStack.increment(1);
                                 } else {
                                     ItemStack ballStack = new ItemStack(RegisterItems.GOLF_BALL);
-                                    RegisterItems.GOLF_BALL.setColor(ballStack, ball.getColor());
+                                    RegisterItems.GOLF_BALL.setColor(ballStack, ballEntity.getColor());
                                     player.giveItemStack(ballStack);
                                 }
                             }
@@ -155,7 +173,6 @@ public class GolfBallEntityEvents {
         ON_HOLE_ENTER.register((world, ball, holePos) -> {
             if (world instanceof ServerWorld serverWorld) {
 
-
                 if (!ball.isGoaled()) {// Play cup drop sound
                     serverWorld.playSound(
                             null,
@@ -173,7 +190,7 @@ public class GolfBallEntityEvents {
                     );
                 }
 
-                ball.setGoaled();
+                ball.setGoaled(true);
             }
         });
     }

@@ -6,7 +6,8 @@
   "mixins": [
   ],
   "client": [
-    "MyGolfMixin"
+    "MyGolfMixin",
+    "AnvilScreenHandlerMixin"
   ],
   "injectors": {
     "defaultRequire": 1

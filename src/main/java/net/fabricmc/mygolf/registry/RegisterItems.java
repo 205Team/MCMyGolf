@@ -1,5 +1,6 @@
 package net.fabricmc.mygolf.registry;
 
+import net.fabricmc.fabric.api.client.rendering.v1.ColorProviderRegistry;
 import net.fabricmc.fabric.api.itemgroup.v1.FabricItemGroup;
 import net.fabricmc.mygolf.global.CommonStr;
 import net.fabricmc.mygolf.items.*;
@@ -13,6 +14,7 @@ import net.minecraft.registry.RegistryKey;
 import net.minecraft.registry.RegistryKeys;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
+import net.minecraft.util.math.MathHelper;
 
 /**
  * 注册物品类
@@ -61,6 +63,7 @@ public class RegisterItems {
         registryItem(INTRO_BOOK);
         registryItem(FLAGSTICK_ITEM);
     }
+
 
     /**
      * 注册新BaseItem

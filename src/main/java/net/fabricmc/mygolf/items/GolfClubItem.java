@@ -28,9 +28,11 @@ import java.util.List;
 
 public class GolfClubItem extends Item implements ItemAbstract {
 
-    public static final float[] LOFT_PRESETS = { -5.0f, -15.0f, -30.0f, -45.0f, -60.0f, -75.0f };   // Preset loft angles (Negative pitch = UP in Minecraft)
+    public static final float[] LOFT_PRESETS = { -2.0f, -15.0f, -40.0f, -75.0f };   // Preset loft angles (Negative pitch = UP in Minecraft)
     private static final int MAX_USE_TIME = 72000; // 定义蓄力的最长时间，单位为 tick
+    public static final int MIN_CHARGE_TICKS = 5;  // * 0.05 seconds before a shot fires
     public static final int MAX_CHARGE_TICKS = 60; // * 0.05 seconds to reach 100% power
+    public static final int MAX_LOOPS = 3; // Maximum allowed loops
     public static final double MAX_SHOT_POWER = 1.2; // Max speed multiplier
 
     public GolfClubItem(Item.Settings settings) {
@@ -45,32 +47,39 @@ public class GolfClubItem extends Item implements ItemAbstract {
     @Override
     public TypedActionResult<ItemStack> use(World world, PlayerEntity user, Hand hand) {
         ItemStack stack = user.getStackInHand(hand);
+
+        // 1. Sneak + Right Click -> Toggle Loft immediately (No charging)
+        if (user.isSneaking()) {
+            cycleLoftAngle(stack, user, world);
+            return TypedActionResult.success(stack, world.isClient());
+        }
+
+        // 2. Normal Right Click -> Start charging shot
         user.setCurrentHand(hand);
         return TypedActionResult.consume(stack);
     }
 
-    // 重写 onStoppedUsing 方法，在蓄力时触发动画播放和数据变化，在松开右键时触发击球
+    // Charge and swing
     @Override
     public void onStoppedUsing(ItemStack stack, World world, LivingEntity user, int remainingUseTicks) {
         if (!(user instanceof PlayerEntity player)) return;
 
-        // [----------]
+        // Minimum shot threshold (prevents accidental misfires)
         int heldTicks = this.getMaxUseTime(stack) - remainingUseTicks;
-
-        // Mouse tap
-        // [>---------]
-        if (heldTicks < 5) {
-            cycleLoftAngle(stack, player, world);
-            return;
-        }
+        if (heldTicks < MIN_CHARGE_TICKS) return;
 
         if (!world.isClient()) {
-            // Mouse Hold
-            float powerRatio = Math.min(1.0f, (float) heldTicks / MAX_CHARGE_TICKS);
+            int chargeTicks = heldTicks - MIN_CHARGE_TICKS;
+            int maxAllowedTicks = MAX_CHARGE_TICKS * MAX_LOOPS;
 
-            // Minimum shot threshold (prevents accidental misfires)
-            // [->--------]
-            if (powerRatio < 0.15f) return;
+            float powerRatio;
+            if (chargeTicks >= maxAllowedTicks) {
+                // Capped: Exceeded 3 full loops -> force power to 0.0f
+                powerRatio = 0.0f;
+            } else {
+                // Sawtooth Ramp: Continuously resets from 0.0f to 1.0f on each loop completion
+                powerRatio = (float) (chargeTicks % MAX_CHARGE_TICKS) / MAX_CHARGE_TICKS;
+            }
 
             // Find closest GolfBallEntity within 4 blocks of the player
             GolfBallEntity targetBall = GolfBallEntity.getClosestBall(world, player, GolfBallEntity.MIN_RADIUS);
@@ -81,7 +90,6 @@ public class GolfClubItem extends Item implements ItemAbstract {
 
                 // Calculate direction vector using player's horizontal yaw and club loft
                 Vec3d launchDir = Vec3d.fromPolar(currentLoft, player.getYaw());
-                // [----->----]
                 double finalSpeed = powerRatio * MAX_SHOT_POWER;
 
                 // Apply velocity to the ball
@@ -92,21 +100,16 @@ public class GolfClubItem extends Item implements ItemAbstract {
                 if (GolfBallEntity.ENABLE_MAGNUS_EFFECT) {
                     float yawRad = (float) Math.toRadians(player.getYaw());
 
-                    // 1. Backspin scales with shot speed and loft angle steepness
+                    // Backspin scales with shot speed and loft angle steepness
                     double loftMagnitude = Math.abs(currentLoft); // e.g. 5.0 to 75.0
                     double backspinIntensity = finalSpeed * Math.sin(Math.toRadians(loftMagnitude)) * 0.15;
 
-                    // 2. Optional Sidespin (positive = slice/right, negative = hook/left)
-                    // Set to 0.0f or read from player stance / custom curve NBT
-                    double sidespinIntensity = 0.0;
-
-                    // 3. Transform local shot spin to world-space spin vector
+                    // Transform local shot spin to world-space spin vector
                     // Perpendicular axis relative to player facing direction:
                     double backspinX = -Math.cos(yawRad) * backspinIntensity;
                     double backspinZ = -Math.sin(yawRad) * backspinIntensity;
-                    double sidespinY = sidespinIntensity;
 
-                    targetBall.spinVector = new Vec3d(backspinX, sidespinY, backspinZ);
+                    targetBall.spinVector = new Vec3d(backspinX, 0.0, backspinZ);
                 } else {
                     targetBall.spinVector = Vec3d.ZERO;
                 }

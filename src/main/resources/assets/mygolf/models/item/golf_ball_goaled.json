@@ -1,0 +1,7 @@
+{
+  "parent": "item/generated",
+  "textures": {
+    "layer0": "mygolf:item/golf_ball",
+    "layer1": "mygolf:item/flag_overlay"
+  }
+}

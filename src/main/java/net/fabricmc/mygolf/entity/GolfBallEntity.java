@@ -39,7 +39,6 @@ import java.util.List;
 public class GolfBallEntity extends Entity {
 
     private final GolfPhysicsEngine.Config physicsConfig = GolfPhysicsEngine.Config.STANDARD_BALL;
-    private boolean isGoaled = false;
     private ChunkPos lastForcedChunk = null;    // Last forced load chunk for traveling ball
     public final Quaternionf prevWorldRotation = new Quaternionf(); // For rendering rotation
     public final Quaternionf worldRotation = new Quaternionf(); // For rendering rotation// 1. Magnus Config & Spin State
@@ -50,6 +49,7 @@ public class GolfBallEntity extends Entity {
     public static final EntityDimensions BALL_DIMENSIONS = EntityDimensions.fixed(0.25f, 0.25f); // Minecraft's collision box dimensions of ball
     public static final float BALL_HEIGHT = BALL_DIMENSIONS.height; // Jumpy animation ball height
     public static final float DROP_THRESHOLD = 1.5F * BALL_HEIGHT;  // Ball item-drop height
+    private static final TrackedData<Boolean> IS_GOALED = DataTracker.registerData(GolfBallEntity.class, TrackedDataHandlerRegistry.BOOLEAN);
     private static final TrackedData<Integer> HIT_COUNT = DataTracker.registerData(GolfBallEntity.class, TrackedDataHandlerRegistry.INTEGER); // Counts how many times the ball has got hit
     private static final TrackedData<Integer> COLOR = DataTracker.registerData(GolfBallEntity.class, TrackedDataHandlerRegistry.INTEGER);
     private static final TrackedData<Integer> JUMP_TICKS = DataTracker.registerData(GolfBallEntity.class, TrackedDataHandlerRegistry.INTEGER);    // DataTracker keys to sync hit response across the network
@@ -78,14 +78,14 @@ public class GolfBallEntity extends Entity {
         this.dataTracker.set(HIT_COUNT, count);
     }
     public void incrementHitCount() {
-        if (!this.isGoaled){
+        if (!this.isGoaled()){
             this.setHitCount(this.getHitCount() + 1);
         }
 
     }
     public void restHitCount() {
         this.setHitCount(0);
-        this.isGoaled = true;
+        this.setGoaled(false);
     }
 
     public Vec3d getSpin() {
@@ -96,10 +96,10 @@ public class GolfBallEntity extends Entity {
     }
 
     public boolean isGoaled() {
-        return isGoaled;
+        return this.dataTracker.get(IS_GOALED);
     }
-    public void setGoaled() {
-        this.isGoaled = true;
+    public void setGoaled(boolean goaled) {
+        this.dataTracker.set(IS_GOALED, goaled);
     }
 
     public int getJumpTicks() { return this.dataTracker.get(JUMP_TICKS); }
@@ -294,6 +294,7 @@ public class GolfBallEntity extends Entity {
     protected void fall(double d, boolean bl, BlockState blockState, BlockPos blockPos) {
     }
 
+    //Entity → Item
     @Override
     public boolean damage(DamageSource source, float amount) {
         if (this.getWorld().isClient() || this.isRemoved()) return false;
@@ -304,7 +305,19 @@ public class GolfBallEntity extends Entity {
 
         // Break entity & drop item if reaching/exceeding ball height threshold
         if (nextHeight >= DROP_THRESHOLD) {
-            this.dropItem(RegisterItems.GOLF_BALL);
+            ItemStack ballStack = new ItemStack(RegisterItems.GOLF_BALL);
+            // Pass name
+            if (this.hasCustomName()) {
+                ballStack.setCustomName(this.getCustomName());
+            }
+            // Pass color
+            int ballColor = this.getColor();
+            if (ballColor != -1 && ballColor != 0xFFFFFF && ballColor != 0xF9FFFE) {
+                RegisterItems.GOLF_BALL.setColor(ballStack, ballColor);
+            } else {
+                RegisterItems.GOLF_BALL.removeColor(ballStack); // Ensures clean, stackable item
+            }
+            this.dropStack(ballStack);
             this.discard();
             return true;
         }
@@ -343,7 +356,12 @@ public class GolfBallEntity extends Entity {
         int hits = this.getHitCount();
 
         // Create the grey hit count text: "(Hits: 3)"
-        Text hitText = Text.literal(" (Hits: " + hits + ")").formatted(Formatting.GRAY);
+        Text hitText;
+        if (this.isGoaled()) {
+            hitText = Text.literal(" (Hits: " + hits + ")").formatted(Formatting.GOLD);
+        } else{
+            hitText = Text.literal(" (Hits: " + hits + ")").formatted(Formatting.GRAY);
+        }
 
         if (this.hasCustomName()) {
             // If name-tagged: "CustomName (Hits: 3)"
@@ -398,6 +416,7 @@ public class GolfBallEntity extends Entity {
         this.dataTracker.startTracking(HOP_HEIGHT, 0.0F);
         this.dataTracker.startTracking(COLOR, 0xFFFFFF);
         this.dataTracker.startTracking(HIT_COUNT, 0);
+        this.dataTracker.startTracking(IS_GOALED, false);
     }
 
     @Override
@@ -408,11 +427,15 @@ public class GolfBallEntity extends Entity {
         if (nbt.contains("HitCount")) {
             this.setHitCount(nbt.getInt("HitCount"));
         }
+        if (nbt.contains("IsGoaled")) {
+            this.setGoaled(nbt.getBoolean("IsGoaled"));
+        }
     }
 
     @Override
     public void writeCustomDataToNbt(NbtCompound nbt) {
         nbt.putInt("Color", this.getColor());
         nbt.putInt("HitCount", this.getHitCount());
+        nbt.putBoolean("IsGoaled", this.isGoaled());
     }
 }

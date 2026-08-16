@@ -3,7 +3,9 @@ package net.fabricmc.mygolf.items;
 import net.fabricmc.mygolf.entity.GolfBallEntity;
 import net.fabricmc.mygolf.items.base.BaseItem;
 import net.fabricmc.mygolf.registry.RegisterEntities;
+import net.fabricmc.mygolf.registry.RegisterItems;
 import net.minecraft.client.item.TooltipContext;
+import net.minecraft.entity.Entity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.DyeableItem;
 import net.minecraft.item.ItemStack;
@@ -26,6 +28,8 @@ import java.util.List;
 public class GolfBall extends BaseItem implements DyeableItem {
 
     static int maxCount = 64;    //最大堆叠数量
+    private static final int PURE_WHITE = 0xFFFFFF;
+    private static final int VANILLA_WHITE = 0xF9FFFE;   // DyeColor.WHITE
 
     public GolfBall(Settings settings) {
         super(settings);
@@ -45,12 +49,17 @@ public class GolfBall extends BaseItem implements DyeableItem {
     @Override
     public void appendTooltip(ItemStack stack, @Nullable World world, List<Text> tooltip, TooltipContext context) {
         int hits = 0;
-        if (stack.hasNbt() && stack.getNbt().contains("HitCount")) {
+        if(stack.hasNbt() && stack.getNbt().contains("HitCount")) {
             hits = stack.getNbt().getInt("HitCount");
+            if (hits > 0) {
+                if (stack.getNbt().contains("IsGoaled") && stack.getNbt().getBoolean("IsGoaled")) {
+                    tooltip.add(Text.literal("Hits: " + hits).formatted(Formatting.GOLD));
+                }else {
+                    tooltip.add(Text.literal("Hits: " + hits).formatted(Formatting.GRAY));
+                }
+            }
         }
-        if (hits > 0) {
-            tooltip.add(Text.literal("Hits: " + hits).formatted(Formatting.GOLD));
-        }
+
         super.appendTooltip(stack, world, tooltip, context);
         tooltip.add(Text.translatable("空手右键可回收").formatted(Formatting.GRAY));
     }
@@ -92,17 +101,37 @@ public class GolfBall extends BaseItem implements DyeableItem {
             }else {
                 golfBallEntity.updatePosition(hitResult.getPos().x, hitResult.getPos().y, hitResult.getPos().z);
             }
+
             // Apply the dyed item color to the spawned entity
-            golfBallEntity.setColor(this.getColor(itemStack));
+            if (RegisterItems.GOLF_BALL.hasColor(itemStack)) {
+                int itemColor = RegisterItems.GOLF_BALL.getColor(itemStack);
 
-            // Pass hitcount from itemStack ball to entity ball
-            int savedHits = 0;
-            if (itemStack.hasNbt() && itemStack.getNbt().contains("HitCount")) {
-                savedHits = itemStack.getNbt().getInt("HitCount");
+                // Treat white as undyed (-1)
+                if (itemColor == 0xFFFFFF || itemColor == 0xF9FFFE) {
+                    golfBallEntity.setColor(-1);
+                } else {
+                    golfBallEntity.setColor(itemColor);
+                }
+            } else {
+                golfBallEntity.setColor(-1); // Default undyed state
             }
-            golfBallEntity.setHitCount(savedHits);
 
-            // Spawn ball
+            // Pass Custom Name
+            if (itemStack.hasCustomName()) {
+                golfBallEntity.setCustomName(itemStack.getName());
+            }
+
+            // Pass IsGoaled and HitCount
+            if (itemStack.hasNbt()) {
+                if (itemStack.getNbt().contains("IsGoaled")) {
+                    golfBallEntity.setGoaled(itemStack.getNbt().getBoolean("IsGoaled"));
+                }
+                if (itemStack.getNbt().contains("HitCount")) {
+                    golfBallEntity.setHitCount(itemStack.getNbt().getInt("HitCount"));
+                }
+            }
+
+            // Spawn ball, Item → Entity
             level.spawnEntity(golfBallEntity);
 
             if (!user.getAbilities().creativeMode) {
@@ -120,5 +149,49 @@ public class GolfBall extends BaseItem implements DyeableItem {
             return nbt.getInt(COLOR_KEY);
         }
         return 0xFFFFFF; // Default White
+    }
+    public static boolean isGoaled(ItemStack stack) {
+        return stack != null && !stack.isEmpty() && stack.hasNbt() && stack.getNbt().getBoolean("IsGoaled");
+    }
+
+    @Override
+    public void setColor(ItemStack stack, int color) {
+        if (color == PURE_WHITE || color == VANILLA_WHITE) {
+            this.removeColor(stack); // Strips 'display.color' NBT entirely
+        } else {
+            DyeableItem.super.setColor(stack, color);
+        }
+    }
+
+    public static void sanitizeNbt(ItemStack stack) {
+        if (!stack.hasNbt()) return;
+
+        NbtCompound nbt = stack.getNbt();
+
+        // 1. If no custom name exists, strip Anvil RepairCost and empty display tags
+        if (!stack.hasCustomName()) {
+            nbt.remove("RepairCost");
+
+            if (nbt.contains("display")) {
+                NbtCompound display = nbt.getCompound("display");
+                display.remove("Name");
+                if (display.isEmpty()) {
+                    nbt.remove("display");
+                }
+            }
+        }
+
+        // 2. Strip default/zero values if present
+        if (nbt.contains("HitCount") && nbt.getInt("HitCount") <= 0) {
+            nbt.remove("HitCount");
+        }
+        if (nbt.contains("IsGoaled") && !nbt.getBoolean("IsGoaled")) {
+            nbt.remove("IsGoaled");
+        }
+
+        // 3. Fully nullify NBT if empty so stack.hasNbt() == false
+        if (nbt.isEmpty()) {
+            stack.setNbt(null);
+        }
     }
 }

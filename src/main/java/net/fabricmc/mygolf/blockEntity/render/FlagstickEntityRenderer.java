@@ -69,7 +69,7 @@ public class FlagstickEntityRenderer implements BlockEntityRenderer<FlagstickEnt
                 vertexConsumers,
                 FLAGSTICK_BEAM_TEXTURE,
                 customTickDelta,
-                0.02F,         // Height scale
+                0.05F,         // Height scale
                 customTime,
                 0,            // Y offset starting point
                 beamHeight,   // Maximum Y height

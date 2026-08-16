@@ -54,7 +54,7 @@ public class FlagstickBlock extends BaseBlockWithEntity {
                         .copy(Blocks.STONE)
                         .pistonBehavior(PistonBehavior.DESTROY)
                         .nonOpaque()
-                        .luminance(state ->15)
+                        .luminance(state -> 15)
         );
     }
 

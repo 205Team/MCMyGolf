@@ -33,6 +33,7 @@ import java.util.List;
 public class GolfBallEntityRenderer extends EntityRenderer<GolfBallEntity> {
     private final GolfBallEntityModel model;
     public static final Identifier BLANK_BEAM_TEXTURE = new Identifier(CommonStr.modId, "textures/entity/blank_beam.png");
+    private static final Identifier FLAG_ICON_TEXTURE = new Identifier(CommonStr.modId, "textures/item/flag_overlay.png");
     private static final int MAX_TOTAL_SPHERES = 60;    // Cap maximum total sphere draw calls per entity frame
     private static final double SLOW_SPEED_THRESHOLD_SQ = 0.1 * 0.1; // Ball speed upper limit for beam rendering
     private static final int MAX_TRAJECTORY_STEPS = 10; // Length of the trail
@@ -63,9 +64,11 @@ public class GolfBallEntityRenderer extends EntityRenderer<GolfBallEntity> {
 
         matrixStack.pop();
 
+        // Super
+        super.render(ballEntity, yaw, tickDelta, matrixStack, vertexConsumers, light);
+
         // Render arrow or beam
         double distanceSq = client.player.squaredDistanceTo(ballEntity);
-
         if (distanceSq <= GolfBallEntity.MIN_DISTANCE_SQ) {
         } else if (distanceSq <= GolfBallEntity.MID_DISTANCE_SQ) {
             renderArrow(ballEntity, matrixStack, vertexConsumers, light, tickDelta);
@@ -75,8 +78,11 @@ public class GolfBallEntityRenderer extends EntityRenderer<GolfBallEntity> {
             }
         }
 
-        // Super
-        super.render(ballEntity, yaw, tickDelta, matrixStack, vertexConsumers, light);
+        // Render flag icon if goaled
+        if (ballEntity.isGoaled()) {
+            renderFlagIcon(matrixStack, vertexConsumers, light);
+        }
+
     }
 
     private void renderModel(GolfBallEntity ballEntity, float tickDelta, MatrixStack matrixStack, VertexConsumerProvider vertexConsumers, int light) {
@@ -192,8 +198,8 @@ public class GolfBallEntityRenderer extends EntityRenderer<GolfBallEntity> {
         VertexConsumer buffer = vertexConsumers.getBuffer(RenderLayer.getDebugQuads());
         Matrix4f posMatrix = matrices.peek().getPositionMatrix();
 
-        float radius = 0.12F;
-        float height = 0.18F;
+        float radius = 0.10F;
+        float height = 0.15F;
         int segments = 6; // Increase for smoother cone, decrease for performance/blocky style
         int r = 255, g = 40, b = 40, a = 255; // Red color
 
@@ -342,7 +348,47 @@ public class GolfBallEntityRenderer extends EntityRenderer<GolfBallEntity> {
         }
     }
 
+    private void renderFlagIcon(MatrixStack matrices, VertexConsumerProvider vertexConsumers, int light) {
+        matrices.push();
 
+        // 1. ROTATE FIRST: Align transformation axes to camera view
+        // Now: +X = Screen Right, +Y = Screen Up, -Z = Toward Camera
+        matrices.multiply(this.dispatcher.getRotation());
+
+        // 2. TRANSLATE IN CAMERA/SCREEN SPACE
+        double ballRadius = GolfBallEntity.BALL_HEIGHT; // Adjust based on your ball size
+        double offsetFront = -ballRadius - 0.01; // Push toward camera in front of ball surface
+
+        matrices.translate(0.0D, 0.05D, offsetFront);
+
+        // 3. SCALE: Keep icon small relative to the ball
+        float scale = 0.5F;
+        matrices.scale(scale, scale, scale);
+
+        // 4. DRAW QUAD
+        int fullbright = 200;
+        VertexConsumer buffer = vertexConsumers.getBuffer(RenderLayer.getEntityCutoutNoCull(FLAG_ICON_TEXTURE));
+        MatrixStack.Entry entry = matrices.peek();
+
+        drawVertex(entry, buffer, -0.5F,  0.5F, 0.0F, 1.0F, 0.0F, fullbright);
+        drawVertex(entry, buffer,  0.5F,  0.5F, 0.0F, 0.0F, 0.0F, fullbright);
+        drawVertex(entry, buffer,  0.5F, -0.5F, 0.0F, 0.0F, 1.0F, fullbright);
+        drawVertex(entry, buffer, -0.5F, -0.5F, 0.0F, 1.0F, 1.0F, fullbright);
+
+        matrices.pop();
+    }
+
+    private static void drawVertex(MatrixStack.Entry entry, VertexConsumer buffer, float x, float y, float z, float u, float v, int light) {
+        buffer.vertex(entry.getPositionMatrix(), x, y, z)
+                .color(255, 255, 255, 255)
+                .texture(u, v)
+                .overlay(OverlayTexture.DEFAULT_UV)
+                .light(light)
+                .normal(entry.getNormalMatrix(), 0.0F, 1.0F, 0.0F)
+                .next();
+    }
+
+    /// Overrides
     @Override
     public boolean shouldRender(GolfBallEntity entity, Frustum frustum, double d, double e, double f) {
         return true;
@@ -387,11 +433,9 @@ public class GolfBallEntityRenderer extends EntityRenderer<GolfBallEntity> {
 
         // Position label height above the ball
         double offsetY = entity.getHeight() + 0.3D;
-        matrices.translate(0.0D, entity.getNameLabelHeight(), 0.0D);
+        matrices.translate(0.0D, offsetY, 0.0D);
 
         matrices.multiply(this.dispatcher.getRotation());
-
-        matrices.translate(0.0D, 0.0D, -0.05D);
 
         // Custom text scale (Vanilla default is -0.025F)
         float scale = -0.015F;
@@ -405,6 +449,19 @@ public class GolfBallEntityRenderer extends EntityRenderer<GolfBallEntity> {
         TextRenderer textRenderer = this.getTextRenderer();
         float xOffset = -textRenderer.getWidth(text) / 2.0F;
 
+        textRenderer.draw(
+                text,
+                xOffset,
+                0,
+                553648127, // Dimmed see-through text color (ARGB)
+                false,
+                matrix4f,
+                vertexConsumers,
+                TextRenderer.TextLayerType.SEE_THROUGH,
+                backgroundColor,
+                light
+        );
+
         // 4. Render label text
         textRenderer.draw(
                 text,
@@ -414,8 +471,8 @@ public class GolfBallEntityRenderer extends EntityRenderer<GolfBallEntity> {
                 false,
                 matrix4f,
                 vertexConsumers,
-                TextRenderer.TextLayerType.SEE_THROUGH,
-                backgroundColor,
+                TextRenderer.TextLayerType.POLYGON_OFFSET,
+                0,
                 light
         );
 

@@ -4,6 +4,14 @@
 	"textures": {
 		"layer0": "mygolf:item/golf_ball"
 	},
+	"overrides": [
+		{
+			"predicate": {
+				"mygolf:goaled": 1.0
+			},
+			"model": "mygolf:item/golf_ball_goaled"
+		}
+	],
 	"display": {
 		"thirdperson_righthand": {
 			"translation": [0, 0.75, -0.25],
