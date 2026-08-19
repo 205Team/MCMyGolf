@@ -26,7 +26,6 @@ import net.minecraft.util.math.Vec3d;
 import org.joml.Matrix4f;
 import org.joml.Quaternionf;
 
-import java.util.ArrayList;
 import java.util.List;
 
 @Environment(EnvType.CLIENT)
@@ -34,9 +33,9 @@ public class GolfBallEntityRenderer extends EntityRenderer<GolfBallEntity> {
     private final GolfBallEntityModel model;
     public static final Identifier BLANK_BEAM_TEXTURE = new Identifier(CommonStr.modId, "textures/entity/blank_beam.png");
     private static final Identifier FLAG_ICON_TEXTURE = new Identifier(CommonStr.modId, "textures/item/flag_overlay.png");
-    private static final int MAX_TOTAL_SPHERES = 60;    // Cap maximum total sphere draw calls per entity frame
+    private static final Identifier ARROW_TEXTURE = new Identifier(CommonStr.modId, "textures/misc/arrow.png");
     private static final double SLOW_SPEED_THRESHOLD_SQ = 0.1 * 0.1; // Ball speed upper limit for beam rendering
-    private static final int MAX_TRAJECTORY_STEPS = 10; // Length of the trail
+    private static final int MAX_TRAJECTORY_STEPS = 15; // * 0.05 seconds of trajectory predicted
 
     public GolfBallEntityRenderer(EntityRendererFactory.Context context) {
         super(context);
@@ -45,19 +44,19 @@ public class GolfBallEntityRenderer extends EntityRenderer<GolfBallEntity> {
     }
 
     public void render(GolfBallEntity ballEntity, float yaw, float tickDelta, MatrixStack matrixStack, VertexConsumerProvider vertexConsumers, int light) {
-        // Render trail first
-        renderTrail(ballEntity, tickDelta, matrixStack, vertexConsumers, light);
 
-        MinecraftClient client = MinecraftClient.getInstance();
-        if (client.player == null) return;
+        ClientPlayerEntity player = MinecraftClient.getInstance().player;
+        if (player == null) return;
 
+        // Render 2D textured arrow flat on ground
+        renderAimArrow(ballEntity, player, tickDelta, matrixStack, vertexConsumers, light);
         // Render trajectory preview while charging club
-        renderTrajectoryPreview(ballEntity, client.player, tickDelta, matrixStack, vertexConsumers, light);
+        renderTrajectoryPreview(ballEntity, player, tickDelta, matrixStack, vertexConsumers, light);
 
         matrixStack.push();
 
         // Render ball jumping animation
-        renderJumpy(ballEntity, tickDelta, matrixStack, vertexConsumers, light);
+        renderJumpy(ballEntity, tickDelta, matrixStack);
 
         // Render ball model
         renderModel(ballEntity, tickDelta, matrixStack, vertexConsumers, light);
@@ -68,10 +67,10 @@ public class GolfBallEntityRenderer extends EntityRenderer<GolfBallEntity> {
         super.render(ballEntity, yaw, tickDelta, matrixStack, vertexConsumers, light);
 
         // Render arrow or beam
-        double distanceSq = client.player.squaredDistanceTo(ballEntity);
+        double distanceSq = player.squaredDistanceTo(ballEntity);
         if (distanceSq <= GolfBallEntity.MIN_DISTANCE_SQ) {
         } else if (distanceSq <= GolfBallEntity.MID_DISTANCE_SQ) {
-            renderArrow(ballEntity, matrixStack, vertexConsumers, light, tickDelta);
+            renderCone(ballEntity, matrixStack, vertexConsumers, light, tickDelta);
         } else if (distanceSq <= GolfBallEntity.MAX_DISTANCE_SQ) {
             if (ballEntity.getVelocity().lengthSquared() <= SLOW_SPEED_THRESHOLD_SQ) {
                 renderBeaconBeam(ballEntity, tickDelta, matrixStack, vertexConsumers);
@@ -102,7 +101,7 @@ public class GolfBallEntityRenderer extends EntityRenderer<GolfBallEntity> {
         model.render(matrixStack, vertexConsumer, light, OverlayTexture.DEFAULT_UV, red, green, blue, 1.0F);
     }
 
-    private void renderJumpy(GolfBallEntity ballEntity, float tickDelta, MatrixStack matrixStack, VertexConsumerProvider vertexConsumers, int light) {
+    private void renderJumpy(GolfBallEntity ballEntity, float tickDelta, MatrixStack matrixStack) {
 
         // Render dynamic hop arc scaled by current hop height
         float remainingTicks = Math.max(0.0F, (float) ballEntity.getJumpTicks() - tickDelta);
@@ -119,71 +118,7 @@ public class GolfBallEntityRenderer extends EntityRenderer<GolfBallEntity> {
 
     }
 
-    private void renderTrail(GolfBallEntity entity, float tickDelta, MatrixStack matrices, VertexConsumerProvider vertexConsumers, int light) {
-        if (entity.trailPositions.isEmpty()) return;
-
-        // Use translucent entity layer so alpha transparency works
-        VertexConsumer buffer = vertexConsumers.getBuffer(RenderLayer.getEntityTranslucent(this.getTexture(entity)));
-        Vec3d entityPos = entity.getLerpedPos(tickDelta);
-
-        List<Vec3d> keyframes = new ArrayList<>();
-        keyframes.add(entityPos);
-        keyframes.addAll(entity.trailPositions);
-
-        // Calculate total distance across all keyframes
-        double totalDistance = 0.0;
-        for (int i = 0; i < keyframes.size() - 1; i++) {
-            totalDistance += keyframes.get(i).distanceTo(keyframes.get(i + 1));
-        }
-        if (totalDistance <= 0.001) return;
-        // Determine effective step size: expands stepSize if distance > MAX_TOTAL_SPHERES * baseStepSize
-        double baseStepSize = 0.12;
-        double effectiveStepSize = Math.max(baseStepSize, totalDistance / MAX_TOTAL_SPHERES);
-
-        // Extract dye color components
-        int color = entity.getColor();
-        float red = ((color >> 16) & 0xFF) / 255.0F;
-        float green = ((color >> 8) & 0xFF) / 255.0F;
-        float blue = (color & 0xFF) / 255.0F;
-
-        int totalSegments = keyframes.size() - 1;
-        int renderedSpheres = 0; // Hard safety counter
-
-        for (int i = 0; i < totalSegments; i++) {
-            Vec3d start = keyframes.get(i);
-            Vec3d end = keyframes.get(i + 1);
-
-            double distance = start.distanceTo(end);
-            // Determine how many sub-spheres are needed to bridge this segment without gaps
-            int steps = Math.max(1, (int) Math.ceil(distance / effectiveStepSize));
-
-            for (int step = 0; step < steps; step++) {
-                // Absolute safety break
-                if (renderedSpheres >= MAX_TOTAL_SPHERES) return;
-
-                double t = (double) step / steps;
-
-                // Linearly interpolate between start and end
-                Vec3d interpolatedPos = start.lerp(end, t);
-                Vec3d offset = interpolatedPos.subtract(entityPos);
-
-                // Calculate overall progress along the full trail length (0.0 = head, 1.0 = tail)
-                double globalProgress = ((double) i + t) / totalSegments;
-                float alpha = (float) (1.0 - globalProgress) * 0.6F; // Fades out over 0.2s
-
-                matrices.push();
-                matrices.translate(offset.x, offset.y, offset.z);
-
-                // Render seamless sub-sphere
-                this.model.render(matrices, buffer, light, OverlayTexture.DEFAULT_UV, red, green, blue, alpha);
-
-                matrices.pop();
-                renderedSpheres++;
-            }
-        }
-    }
-
-    private void renderArrow(GolfBallEntity entity, MatrixStack matrices, VertexConsumerProvider vertexConsumers, int light, float tickDelta) {
+    private void renderCone(GolfBallEntity entity, MatrixStack matrices, VertexConsumerProvider vertexConsumers, int light, float tickDelta) {
         matrices.push();
 
         // 1. Translate above the ball in world space
@@ -285,13 +220,26 @@ public class GolfBallEntityRenderer extends EntityRenderer<GolfBallEntity> {
 
         // Calculate charge power ratio
         int heldTicks = activeStack.getMaxUseTime() - player.getItemUseTimeLeft();
-        float powerRatio = Math.min(1.0f, (float) heldTicks / GolfClubItem.MAX_CHARGE_TICKS);
+        if (heldTicks < GolfClubItem.MIN_CHARGE_TICKS) return;
 
-        // Require minimum threshold before showing prediction arc
-        if (powerRatio < 0.15f) return;
+        // Sawtooth Ramp & 3-Loop Capping matching onStoppedUsing
+        int chargeTicks = heldTicks - GolfClubItem.MIN_CHARGE_TICKS;
+        float currentLoft = GolfClubItem.getSelectedLoft(activeStack);
+        int maxAllowedTicks = GolfClubItem.MAX_CHARGE_TICKS * GolfClubItem.MAX_LOOPS;
+
+        float powerRatio;
+        if (chargeTicks >= maxAllowedTicks) {
+            // Capped: Exceeded max loops -> force power to 0.0f
+            powerRatio = 0.0f;
+        } else {
+            // Sawtooth Ramp: Continuously resets from 0.0f to 1.0f on each loop completion
+            powerRatio = GolfClubItem.calculatePowerRatio(chargeTicks, currentLoft);
+        }
+
+        // Hide trajectory if power is 0 (e.g. capped out or at exact loop start)
+        if (powerRatio <= 0.0f) return;
 
         // --- PHYSICS SIMULATION ---
-        float currentLoft = GolfClubItem.getSelectedLoft(activeStack);
         Vec3d launchDir = Vec3d.fromPolar(currentLoft, player.getYaw());
         double finalSpeed = powerRatio * GolfClubItem.MAX_SHOT_POWER;
         Vec3d impulse = launchDir.multiply(finalSpeed);
@@ -336,7 +284,11 @@ public class GolfBallEntityRenderer extends EntityRenderer<GolfBallEntity> {
             Vec3d offset = point.subtract(entityPos);
 
             float progress = (float) i / totalPoints;
-            float alpha = (1.0F - progress) * 0.6F;
+
+            // Quadratic drop-off: stays brighter near the start, fades out fast towards the end
+            float alpha = (float) Math.pow(1.0F - progress, 2.0) * 0.7F;
+
+            if (alpha <= 0.01F) continue; // Skip rendering practically invisible spheres
 
             matrixStack.push();
             matrixStack.translate(offset.x, offset.y + radius, offset.z);
@@ -346,6 +298,70 @@ public class GolfBallEntityRenderer extends EntityRenderer<GolfBallEntity> {
 
             matrixStack.pop();
         }
+    }
+
+    private void renderAimArrow(GolfBallEntity ballEntity, PlayerEntity player, float tickDelta, MatrixStack matrices, VertexConsumerProvider vertexConsumers, int light) {
+        if (player.isUsingItem()) return;
+
+        ItemStack heldStack = player.getMainHandStack();
+        if (!(heldStack.getItem() instanceof GolfClubItem)) {
+            heldStack = player.getOffHandStack();
+            if (!(heldStack.getItem() instanceof GolfClubItem)) return;
+        }
+
+        // Only render for the ball closest to the player
+        GolfBallEntity closestBall = GolfBallEntity.getClosestBall(player.getWorld(), player, GolfBallEntity.MIN_RADIUS);
+        if (closestBall != ballEntity) return;
+
+        // Tilt arrow upward according to club loft angle
+        float loft = GolfClubItem.getSelectedLoft(heldStack);
+
+        matrices.push();
+
+        // 1. Position slightly above ground at the base of the ball to prevent Z-fighting
+        matrices.translate(0.0, 0.02, 0.0);
+
+        // 2. Rotate arrow to align with the player's aiming direction (Yaw)
+        // -player.getYaw() aligns +Z forward along the shot angle
+        matrices.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(-player.getYaw()));
+
+        // 3. Obtain VertexConsumer using translucent or cutout layer (no backface culling)
+        VertexConsumer buffer = vertexConsumers.getBuffer(RenderLayer.getEntityTranslucent(ARROW_TEXTURE));
+
+        // Arrow dimensions (in blocks)
+        float width = 0.5f;
+        float length = 0.5f;
+        float halfWidth = width / 2.0f;
+        float startOffset = 0.35f; // Offset slightly in front of ball center
+
+        double loftRad = Math.toRadians(loft);
+        float cosLoft = (float) Math.cos(loftRad);
+
+        // Project both the start and end offsets onto the XZ plane
+        float shadowStartOffset = startOffset * cosLoft;
+        float shadowEndOffset = (startOffset + length) * cosLoft;
+
+        // Fade tip opacity as it raises higher off the ground
+        int tipAlpha = (int) (80 * cosLoft);
+
+        matrices.push();
+        MatrixStack.Entry shadowEntry = matrices.peek();
+        drawVertex(shadowEntry, buffer, -halfWidth, 0.0f, shadowEndOffset, 0.0f, 0.0f, 0, 0, 0, tipAlpha, light);
+        drawVertex(shadowEntry, buffer,  halfWidth, 0.0f, shadowEndOffset, 1.0f, 0.0f, 0, 0, 0, tipAlpha, light);
+        drawVertex(shadowEntry, buffer,  halfWidth, 0.0f, shadowStartOffset,          1.0f, 1.0f, 0, 0, 0, 80, light);
+        drawVertex(shadowEntry, buffer, -halfWidth, 0.0f, shadowStartOffset,          0.0f, 1.0f, 0, 0, 0, 80, light);
+        matrices.pop();
+
+        matrices.push();
+        matrices.multiply(RotationAxis.POSITIVE_X.rotationDegrees(loft));
+        MatrixStack.Entry arrowEntry = matrices.peek();
+        drawVertex(arrowEntry, buffer, -halfWidth, 0.0f, startOffset + length, 0.0f, 0.0f, 255, 255, 255, 100, light); // Bottom-Left
+        drawVertex(arrowEntry, buffer,  halfWidth, 0.0f, startOffset + length, 1.0f, 0.0f, 255, 255, 255, 100, light); // Bottom-Right
+        drawVertex(arrowEntry, buffer,  halfWidth, 0.0f, startOffset,          1.0f, 1.0f, 255, 255, 255, 100, light); // Top-Right
+        drawVertex(arrowEntry, buffer, -halfWidth, 0.0f, startOffset,          0.0f, 1.0f, 255, 255, 255, 100, light); // Top-Left
+        matrices.pop();
+
+        matrices.pop();
     }
 
     private void renderFlagIcon(MatrixStack matrices, VertexConsumerProvider vertexConsumers, int light) {
@@ -358,7 +374,6 @@ public class GolfBallEntityRenderer extends EntityRenderer<GolfBallEntity> {
         // 2. TRANSLATE IN CAMERA/SCREEN SPACE
         double ballRadius = GolfBallEntity.BALL_HEIGHT; // Adjust based on your ball size
         double offsetFront = -ballRadius - 0.01; // Push toward camera in front of ball surface
-
         matrices.translate(0.0D, 0.05D, offsetFront);
 
         // 3. SCALE: Keep icon small relative to the ball
@@ -370,17 +385,17 @@ public class GolfBallEntityRenderer extends EntityRenderer<GolfBallEntity> {
         VertexConsumer buffer = vertexConsumers.getBuffer(RenderLayer.getEntityCutoutNoCull(FLAG_ICON_TEXTURE));
         MatrixStack.Entry entry = matrices.peek();
 
-        drawVertex(entry, buffer, -0.5F,  0.5F, 0.0F, 1.0F, 0.0F, fullbright);
-        drawVertex(entry, buffer,  0.5F,  0.5F, 0.0F, 0.0F, 0.0F, fullbright);
-        drawVertex(entry, buffer,  0.5F, -0.5F, 0.0F, 0.0F, 1.0F, fullbright);
-        drawVertex(entry, buffer, -0.5F, -0.5F, 0.0F, 1.0F, 1.0F, fullbright);
+        drawVertex(entry, buffer, -0.5F,  0.5F, 0.0F, 1.0F, 0.0F, 255, 255, 255, 255, fullbright); // Top-Left
+        drawVertex(entry, buffer,  0.5F,  0.5F, 0.0F, 0.0F, 0.0F, 255, 255, 255, 255, fullbright); // Top-Right
+        drawVertex(entry, buffer,  0.5F, -0.5F, 0.0F, 0.0F, 1.0F, 255, 255, 255, 255, fullbright); // Bottom-Right
+        drawVertex(entry, buffer, -0.5F, -0.5F, 0.0F, 1.0F, 1.0F, 255, 255, 255, 255, fullbright); // Bottom-Left
 
         matrices.pop();
     }
 
-    private static void drawVertex(MatrixStack.Entry entry, VertexConsumer buffer, float x, float y, float z, float u, float v, int light) {
+    private static void drawVertex(MatrixStack.Entry entry, VertexConsumer buffer, float x, float y, float z, float u, float v, int r, int g, int b, int alpha, int light) {
         buffer.vertex(entry.getPositionMatrix(), x, y, z)
-                .color(255, 255, 255, 255)
+                .color(r, g, b, alpha)
                 .texture(u, v)
                 .overlay(OverlayTexture.DEFAULT_UV)
                 .light(light)
@@ -432,13 +447,13 @@ public class GolfBallEntityRenderer extends EntityRenderer<GolfBallEntity> {
         matrices.push();
 
         // Position label height above the ball
-        double offsetY = entity.getHeight() + 0.3D;
+        double offsetY = entity.getHeight() + 0.2D;
         matrices.translate(0.0D, offsetY, 0.0D);
 
         matrices.multiply(this.dispatcher.getRotation());
 
         // Custom text scale (Vanilla default is -0.025F)
-        float scale = -0.015F;
+        float scale = -0.010F;
         matrices.scale(scale, scale, Math.abs(scale));
 
         Matrix4f matrix4f = matrices.peek().getPositionMatrix();
@@ -453,7 +468,7 @@ public class GolfBallEntityRenderer extends EntityRenderer<GolfBallEntity> {
                 text,
                 xOffset,
                 0,
-                553648127, // Dimmed see-through text color (ARGB)
+                0x20FFFFFF, // Dimmed see-through text color (ARGB)
                 false,
                 matrix4f,
                 vertexConsumers,
@@ -467,7 +482,7 @@ public class GolfBallEntityRenderer extends EntityRenderer<GolfBallEntity> {
                 text,
                 xOffset,
                 0,
-                0xFFFFFFFF, // White text with full opacity
+                0xDFFFFFFF, // White text with full opacity
                 false,
                 matrix4f,
                 vertexConsumers,

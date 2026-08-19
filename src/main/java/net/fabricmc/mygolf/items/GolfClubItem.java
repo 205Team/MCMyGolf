@@ -1,11 +1,10 @@
 package net.fabricmc.mygolf.items;
 
+import net.fabricmc.mygolf.MyGolfModClient;
 import net.fabricmc.mygolf.entity.GolfBallEntity;
 import net.fabricmc.mygolf.items.base.ItemAbstract;
 import net.fabricmc.mygolf.registry.RegisterSounds;
-import net.fabricmc.mygolf.tools.DebugUtil;
 import net.fabricmc.mygolf.tools.StringTool;
-import net.minecraft.entity.Entity;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.Item;
@@ -18,22 +17,21 @@ import net.minecraft.util.Formatting;
 import net.minecraft.util.Hand;
 import net.minecraft.util.TypedActionResult;
 import net.minecraft.util.UseAction;
-import net.minecraft.util.math.Box;
+import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.World;
 
-import java.util.Comparator;
-import java.util.List;
 //item：高尔夫球杆
 
 public class GolfClubItem extends Item implements ItemAbstract {
 
-    public static final float[] LOFT_PRESETS = { -2.0f, -15.0f, -40.0f, -75.0f };   // Preset loft angles (Negative pitch = UP in Minecraft)
+    public static final float[] LOFT_PRESETS = { -2.0f, -15.0f, -40.0f, -60.0f, -75.0f };   // Preset loft angles (Negative pitch = UP in Minecraft)
     private static final int MAX_USE_TIME = 72000; // 定义蓄力的最长时间，单位为 tick
     public static final int MIN_CHARGE_TICKS = 5;  // * 0.05 seconds before a shot fires
-    public static final int MAX_CHARGE_TICKS = 60; // * 0.05 seconds to reach 100% power
+    public static final int MAX_CHARGE_TICKS = 20; // * 0.05 seconds to reach 100% power
     public static final int MAX_LOOPS = 3; // Maximum allowed loops
-    public static final double MAX_SHOT_POWER = 1.2; // Max speed multiplier
+    public static final double MAX_SHOT_POWER = 3.0; // Max speed multiplier
+    public static final int COOLDOWN_TICKS = 15; // * 0.05 second cooldown
 
     public GolfClubItem(Item.Settings settings) {
         super(settings);
@@ -48,13 +46,17 @@ public class GolfClubItem extends Item implements ItemAbstract {
     public TypedActionResult<ItemStack> use(World world, PlayerEntity user, Hand hand) {
         ItemStack stack = user.getStackInHand(hand);
 
-        // 1. Sneak + Right Click -> Toggle Loft immediately (No charging)
+        // Sneak + Right Click -> Toggle Loft immediately (No charging)
         if (user.isSneaking()) {
             cycleLoftAngle(stack, user, world);
             return TypedActionResult.success(stack, world.isClient());
         }
 
-        // 2. Normal Right Click -> Start charging shot
+        if (user.getItemCooldownManager().isCoolingDown(this)) {
+            return TypedActionResult.fail(stack);
+        }
+
+        // Normal Right Click -> Start charging shot
         user.setCurrentHand(hand);
         return TypedActionResult.consume(stack);
     }
@@ -67,6 +69,7 @@ public class GolfClubItem extends Item implements ItemAbstract {
         // Minimum shot threshold (prevents accidental misfires)
         int heldTicks = this.getMaxUseTime(stack) - remainingUseTicks;
         if (heldTicks < MIN_CHARGE_TICKS) return;
+        float currentLoft = getSelectedLoft(stack);
 
         if (!world.isClient()) {
             int chargeTicks = heldTicks - MIN_CHARGE_TICKS;
@@ -74,19 +77,16 @@ public class GolfClubItem extends Item implements ItemAbstract {
 
             float powerRatio;
             if (chargeTicks >= maxAllowedTicks) {
-                // Capped: Exceeded 3 full loops -> force power to 0.0f
-                powerRatio = 0.0f;
+                // Capped: Exceeded 3 full loops -> force random shot power
+                powerRatio = 0.01f + world.getRandom().nextFloat() * 0.99f;
             } else {
-                // Sawtooth Ramp: Continuously resets from 0.0f to 1.0f on each loop completion
-                powerRatio = (float) (chargeTicks % MAX_CHARGE_TICKS) / MAX_CHARGE_TICKS;
+                powerRatio = calculatePowerRatio(chargeTicks, currentLoft);
             }
 
             // Find closest GolfBallEntity within 4 blocks of the player
             GolfBallEntity targetBall = GolfBallEntity.getClosestBall(world, player, GolfBallEntity.MIN_RADIUS);
 
             if (targetBall != null) {
-                // Read current active loft angle from item NBT
-                float currentLoft = getSelectedLoft(stack);
 
                 // Calculate direction vector using player's horizontal yaw and club loft
                 Vec3d launchDir = Vec3d.fromPolar(currentLoft, player.getYaw());
@@ -113,14 +113,25 @@ public class GolfClubItem extends Item implements ItemAbstract {
                 } else {
                     targetBall.spinVector = Vec3d.ZERO;
                 }
-
-                // Play swing audio
                 playHitSound(world, player);
 
             }else {
                 playSwingSound(world, player);
 
             }
+
+            player.getItemCooldownManager().set(this, COOLDOWN_TICKS);
+        }
+    }
+
+    @Override
+    public void usageTick(World world, LivingEntity user, ItemStack stack, int count) {
+        int heldTicks = this.getMaxUseTime(stack) - count;
+        int maxAllowedTicks = MIN_CHARGE_TICKS + (MAX_CHARGE_TICKS * MAX_LOOPS);
+
+        // Automatically trigger shot when 3 full loops complete
+        if (heldTicks >= maxAllowedTicks) {
+            user.stopUsingItem();
         }
     }
 
@@ -148,21 +159,20 @@ public class GolfClubItem extends Item implements ItemAbstract {
         }
     }
 
-    // 重写 getMaxUseTime 方法，返回蓄力最长时间
-    @Override
-    public int getMaxUseTime(ItemStack stack) {
-        return MAX_USE_TIME;
-    }
+    public static float calculatePowerRatio(float chargeTicks, float loftDegrees) {
+        float linearProgress = (chargeTicks % MAX_CHARGE_TICKS) / (float) MAX_CHARGE_TICKS;
 
-    // 重写 getUseAction 方法，返回 RIGHT_CLICK 类型，表示右键使用
-    @Override
-    public UseAction getUseAction(ItemStack stack) {
-        return UseAction.BOW;
-    }
+        // Normalize loft (0° to 90°) to a 0.0f -> 1.0f range
+        float normalizedLoft = MathHelper.clamp(-loftDegrees / 90.0f, 0.0f, 1.0f);
 
-    //默认设置
-    private static Settings defaultSetting() {
-        return new Settings();
+        // Dynamic Exponent Interpolation:
+        // Low Loft  (0°)  -> Exponent 2.2f (Starts slow, skyrockets near max power)
+        // High Loft (90°) -> Exponent 0.45f (Skyrockets fast early, flattens/slows near max power)
+        float lowLoftExponent = 2.2f;
+        float highLoftExponent = 0.45f;
+        float exponent = lowLoftExponent + (highLoftExponent - lowLoftExponent) * normalizedLoft;
+
+        return (float) Math.pow(linearProgress, exponent);
     }
 
     // 播放击球声音
@@ -179,6 +189,22 @@ public class GolfClubItem extends Item implements ItemAbstract {
         }
     }
 
+    // 重写 getMaxUseTime 方法，返回蓄力最长时间
+    @Override
+    public int getMaxUseTime(ItemStack stack) {
+        return MAX_USE_TIME;
+    }
+
+    // 重写 getUseAction 方法，返回 RIGHT_CLICK 类型，表示右键使用
+    @Override
+    public UseAction getUseAction(ItemStack stack) {
+        return UseAction.BOW;
+    }
+
+    //默认设置
+    private static Settings defaultSetting() {
+        return new Settings();
+    }
     @Override
     public String codeName() {
         return StringTool.getIdFrom(getClass().getSimpleName());

@@ -4,6 +4,7 @@ import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.fabricmc.fabric.api.blockrenderlayer.v1.BlockRenderLayerMap;
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.rendering.v1.*;
 import net.fabricmc.mygolf.blockEntity.render.FlagstickEntityRenderer;
 import net.fabricmc.mygolf.blockEntity.render.FlagstickScreenHandler;
@@ -11,6 +12,7 @@ import net.fabricmc.mygolf.entity.model.GolfBallEntityModel;
 import net.fabricmc.mygolf.entity.renderer.GolfBallEntityRenderer;
 import net.fabricmc.mygolf.events.client.GolfHudOverlay;
 import net.fabricmc.mygolf.global.CommonStr;
+import net.fabricmc.mygolf.items.GolfClubItem;
 import net.fabricmc.mygolf.registry.RegisterBlockEntities;
 import net.fabricmc.mygolf.registry.RegisterBlocks;
 import net.fabricmc.mygolf.registry.RegisterEntities;
@@ -33,6 +35,7 @@ public class MyGolfModClient implements ClientModInitializer {
     public static final EntityModelLayer MODEL_CUBE_LAYER = new EntityModelLayer(new Identifier(CommonStr.modId, "golf_ball"), "main");
     public static final EntityModelLayer MODEL_FLAGSTICK_LAYER = new EntityModelLayer(new Identifier(CommonStr.modId, "flagstick"), "main");
     public static final ScreenHandlerType<FlagstickScreenHandler> FLAGSTICK_SCREEN_HANDLER = new ScreenHandlerType<>(FlagstickScreenHandler::new, FeatureSet.of(FeatureFlags.VANILLA));
+
 
     @Override
     public void onInitializeClient() {
@@ -75,6 +78,7 @@ public class MyGolfModClient implements ClientModInitializer {
                 RegisterItems.GOLF_BALL
         );
 
+        // Ball item flag icon toggle
         ModelPredicateProviderRegistry.register(
                 RegisterItems.GOLF_BALL,
                 new Identifier(CommonStr.modId, "goaled"),
@@ -86,5 +90,6 @@ public class MyGolfModClient implements ClientModInitializer {
                     return 0.0F;
                 }
         );
+
     }
 }

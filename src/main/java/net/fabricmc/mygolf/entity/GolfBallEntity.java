@@ -6,7 +6,6 @@ import net.fabricmc.mygolf.physics.GolfPhysicsEngine;
 import net.fabricmc.mygolf.registry.RegisterItems;
 import net.fabricmc.mygolf.tools.DebugUtil;
 import net.minecraft.block.BlockState;
-import net.minecraft.client.MinecraftClient;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityDimensions;
 import net.minecraft.entity.EntityPose;
@@ -20,6 +19,7 @@ import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
 import net.minecraft.nbt.NbtCompound;
+import net.minecraft.particle.DustParticleEffect;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.text.Text;
 import net.minecraft.util.ActionResult;
@@ -31,21 +31,21 @@ import net.minecraft.util.math.*;
 import net.minecraft.world.RaycastContext;
 import net.minecraft.world.World;
 import org.joml.Quaternionf;
+import org.joml.Vector3f;
 
 import java.util.Comparator;
 import java.util.LinkedList;
-import java.util.List;
 
 public class GolfBallEntity extends Entity {
 
     private final GolfPhysicsEngine.Config physicsConfig = GolfPhysicsEngine.Config.STANDARD_BALL;
     private ChunkPos lastForcedChunk = null;    // Last forced load chunk for traveling ball
     public final Quaternionf prevWorldRotation = new Quaternionf(); // For rendering rotation
-    public final Quaternionf worldRotation = new Quaternionf(); // For rendering rotation// 1. Magnus Config & Spin State
+    public final Quaternionf worldRotation = new Quaternionf(); // For rendering rotation
     public Vec3d spinVector = Vec3d.ZERO;
     public static boolean ENABLE_MAGNUS_EFFECT = true;  // Toggle for Magnus effect(curveballs)
-    private static final int MAX_TRAIL_POINTS = 8; // Length of the trail
-    private static final double SPEED_THRESHOLD_SQ = 1.0; // Trail render lower speed limit
+    private static final double SPEED_THRESHOLD_SQ = 0.5; // Minimum speed squared to spawn trail
+    private static final double FADE_WINDOW_SQ = 0.25;     // Speed range above threshold over which fading occurs
     public static final EntityDimensions BALL_DIMENSIONS = EntityDimensions.fixed(0.25f, 0.25f); // Minecraft's collision box dimensions of ball
     public static final float BALL_HEIGHT = BALL_DIMENSIONS.height; // Jumpy animation ball height
     public static final float DROP_THRESHOLD = 1.5F * BALL_HEIGHT;  // Ball item-drop height
@@ -178,14 +178,7 @@ public class GolfBallEntity extends Entity {
             }
 
             // Handle trail
-            if (vel.lengthSquared() > SPEED_THRESHOLD_SQ) {
-                trailPositions.addFirst(this.getPos());
-            } else if (!trailPositions.isEmpty()) {
-                trailPositions.removeLast();
-            }
-            while (trailPositions.size() > MAX_TRAIL_POINTS) {
-                trailPositions.removeLast();
-            }
+            spawnTrailParticles();
 
             // Debug
             if(this.age % 48 == 0) {
@@ -260,6 +253,64 @@ public class GolfBallEntity extends Entity {
         return hitResult.getType() == HitResult.Type.BLOCK;
     }
 
+    private void spawnTrailParticles() {
+        double speedSq = this.getVelocity().lengthSquared();
+
+        // 1. Instant cutoff if at or below minimum threshold
+        if (speedSq <= SPEED_THRESHOLD_SQ) return;
+
+        // 2. Calculate speed factor (0.0f when near threshold -> 1.0f at normal flight speed)
+        float speedFactor = (float) MathHelper.clamp(
+                (speedSq - SPEED_THRESHOLD_SQ) / FADE_WINDOW_SQ, 0.0, 1.0
+        );
+
+        // Hard stop if speed factor reaches zero
+        if (speedFactor <= 0.0f) return;
+
+        // Center trail at ball origin
+        double radius = this.physicsConfig.radius();
+        Vec3d currentPos = this.getPos().add(0, radius, 0);
+        Vec3d prevPos = new Vec3d(this.prevX, this.prevY + radius, this.prevZ);
+
+        double distance = currentPos.distanceTo(prevPos);
+        if (distance <= 0.001) return;
+
+        // 3. Sub-step interpolation: 12 steps per block moved guarantees no visual gaps
+        int steps = Math.max(1, (int) Math.ceil(distance * 12));
+
+        // 4. Match particle color to entity dye color
+        int color = this.getColor();
+        float red = ((color >> 16) & 0xFF) / 255.0F;
+        float green = ((color >> 8) & 0xFF) / 255.0F;
+        float blue = (color & 0xFF) / 255.0F;
+
+        // Scale size down rapidly near speed threshold
+        float particleScale = 0.65f * speedFactor;
+        DustParticleEffect particleEffect = new DustParticleEffect(new Vector3f(red, green, blue), particleScale);
+
+        for (int i = 0; i < steps; i++) {
+            // 5. Probabilistic spawn drop: density drops off sharply near threshold
+            if (this.random.nextFloat() > speedFactor) continue;
+
+            double delta = (double) i / steps;
+            Vec3d p = prevPos.lerp(currentPos, delta);
+
+            // Subtle random offset for natural dispersion
+            double jitter = 0.015 * speedFactor;
+            double offsetX = (this.random.nextDouble() - 0.5) * jitter;
+            double offsetY = (this.random.nextDouble() - 0.5) * jitter;
+            double offsetZ = (this.random.nextDouble() - 0.5) * jitter;
+
+            this.getWorld().addParticle(
+                    particleEffect,
+                    p.x + offsetX,
+                    p.y + offsetY,
+                    p.z + offsetZ,
+                    0.0, 0.0, 0.0
+            );
+        }
+    }
+
     //    @Override
     //    public boolean isSilent() {
     //        return true;
@@ -268,9 +319,7 @@ public class GolfBallEntity extends Entity {
     // Protect from environmental destruction (fire, cactus, explosions, etc.)
     @Override
     public boolean isInvulnerableTo(DamageSource damageSource) {
-        if (damageSource.isOf(DamageTypes.IN_FIRE) ||
-                damageSource.isOf(DamageTypes.ON_FIRE) ||
-                damageSource.isOf(DamageTypes.CACTUS) ||
+        if (damageSource.isOf(DamageTypes.CACTUS) ||
                 damageSource.isOf(DamageTypes.EXPLOSION) ||
                 damageSource.isOf(DamageTypes.DROWN)) {
             return true;

@@ -49,7 +49,7 @@ public class GolfPhysicsEngine {
         boolean onGround = current.onGround();
 
         // 1. Verify ground support before applying velocity
-        if (onGround && !hasGroundSupport(world, pos, config.radius())) {
+        if (onGround && (vel.y > 0.01 || !hasGroundSupport(world, pos, config.radius()))) {
             onGround = false;
         }
 
@@ -69,7 +69,9 @@ public class GolfPhysicsEngine {
             }
         } else {
             // Air Physics: Air resistance (drag) + Gravity + Magnus force (curve lift from spin)
-            Vec3d magnusForce = spin.crossProduct(vel).multiply(config.liftCoefficient());
+            Vec3d magnusForce = GolfBallEntity.ENABLE_MAGNUS_EFFECT
+                    ? spin.crossProduct(vel).multiply(config.liftCoefficient())
+                    : Vec3d.ZERO;
             newVel = vel.multiply(config.dragCoefficient()).add(0, -config.gravity(), 0).add(magnusForce);
         }
 
@@ -124,15 +126,17 @@ public class GolfPhysicsEngine {
 
                 // Determine if landing hit converts airborne state to ground rolling state
                 boolean hasGround = hasGroundSupport(world, adjustedPos, config.radius());
-                boolean landsOnGround = normalVel.y <= 0 && normal.y > 0.7 && hasGround;
+                double verticalImpactSpeed = Math.abs(normalVel.y);
+                boolean lowVelocityImpact = verticalImpactSpeed < 0.08;
+
+                boolean landsOnGround = normal.y > 0.7 && hasGround && lowVelocityImpact;
 
                 if (landsOnGround) {
-                    double incomingHorizontalSpeed = Math.hypot(currentVel.x, currentVel.z);
-                    if (incomingHorizontalSpeed < 0.0001) {
-                        reflectedVel = Vec3d.ZERO;
-                    } else {
-                        reflectedVel = new Vec3d(reflectedVel.x * 0.95, 0, reflectedVel.z * 0.95);
-                    }
+                    // Ball is moving slowly enough vertically to settle into a ground roll
+                    reflectedVel = new Vec3d(reflectedVel.x * surfaceFriction, 0, reflectedVel.z * surfaceFriction);
+                } else {
+                    // Preserve calculated vertical bounce from normalVel * -surfaceBounciness
+                    currentlyOnGround = false;
                 }
 
                 // Trigger collision events
@@ -144,7 +148,6 @@ public class GolfPhysicsEngine {
                 currentCenter = adjustedPos;
                 currentVel = reflectedVel;
                 currentSpin = currentSpin.multiply(0.98);
-                currentlyOnGround = landsOnGround;
 
                 // Stop remaining substeps if ball came to a halt
                 if (currentlyOnGround && currentVel.lengthSquared() < 0.0001) {
@@ -315,15 +318,41 @@ public class GolfPhysicsEngine {
     public static double getSurfaceRestitution(World world, BlockPos pos) {
         BlockState state = world.getBlockState(pos);
 
-        if (state.isOf(Blocks.SLIME_BLOCK)) return 0.95;    // Trampoline-like bounce
-        if (state.isOf(Blocks.ICE) || state.isOf(Blocks.PACKED_ICE)) return 0.75; // Hard & elastic
-        if (state.isIn(BlockTags.SAND)) return 0.10;         // Sand absorbs almost all kinetic energy
-        if (state.isIn(BlockTags.LEAVES)) return 0.10;         // Leaves absorb almost all kinetic energy
-        if (state.isIn(BlockTags.WOOL)) return 0.25;         // Soft wool dampens energy
-        if (state.isOf(Blocks.GREEN_CARPET)) return 0.35;    // Fairway/Green absorbs moderate bounce
+        // 1. Extreme Bounce (Arcade/Special)
+        if (state.isOf(Blocks.SLIME_BLOCK)) return 0.95;
 
-        // 3. Default Hard Blocks (Stone, Wood, Concrete, Metals)
-        return 0.60;
+        // 2. Ice (Very Slick & Elastic) - Covers Ice, Packed Ice, Blue Ice
+        if (state.isIn(BlockTags.ICE)) return 0.80;
+
+        // 3. Hard Surfaces (Stone, Concrete, Metal, Wood, Bricks)
+        if (state.isIn(BlockTags.STONE_BRICKS) || state.isIn(BlockTags.BASE_STONE_OVERWORLD) ||
+                state.isIn(BlockTags.PLANKS) || state.isOf(Blocks.COPPER_BLOCK) || state.isOf(Blocks.IRON_BLOCK)) {
+            return 0.70;
+        }
+
+        // 4. Grass & Turf (Fairway / Greens)
+        if (state.isOf(Blocks.GRASS_BLOCK) || state.isOf(Blocks.MOSS_BLOCK) ||
+                state.isOf(Blocks.MYCELIUM) || state.isIn(BlockTags.WOOL_CARPETS)) {
+            return 0.55;
+        }
+
+        // 5. Dirt & Mud (Rough) - Absorbs more kinetic energy than fairway grass
+        if (state.isIn(BlockTags.DIRT) || state.isOf(Blocks.MUD) || state.isOf(Blocks.FARMLAND)) {
+            return 0.35;
+        }
+
+        // 6. Soft Dampeners (Wool, Snow)
+        if (state.isIn(BlockTags.WOOL) || state.isIn(BlockTags.SNOW)) {
+            return 0.25;
+        }
+
+        // 7. Bunkers & Tree Canopies (Absorbs nearly all kinetic energy)
+        if (state.isIn(BlockTags.SAND) || state.isIn(BlockTags.LEAVES)) {
+            return 0.10;
+        }
+
+        // Default Fallback (General Hard Blocks)
+        return 0.70;
     }
 
     /**
@@ -366,6 +395,43 @@ public class GolfPhysicsEngine {
             }
         }
 
-        return points;
+        return resampleTrajectory(points, 0.5);
+    }
+
+    /**
+     * Trajectory resampling helper
+     */
+    public static List<Vec3d> resampleTrajectory(List<Vec3d> rawPoints, double spacing) {
+        if (rawPoints.size() < 2 || spacing <= 0) return rawPoints;
+
+        List<Vec3d> resampled = new ArrayList<>();
+        resampled.add(rawPoints.get(0));
+
+        double accumulatedDist = 0.0;
+
+        for (int i = 0; i < rawPoints.size() - 1; i++) {
+            Vec3d p1 = rawPoints.get(i);
+            Vec3d p2 = rawPoints.get(i + 1);
+            double segmentLength = p1.distanceTo(p2);
+
+            if (segmentLength <= 0.0001) continue;
+
+            double segmentOffset = 0.0;
+
+            while (accumulatedDist + (segmentLength - segmentOffset) >= spacing) {
+                double needed = spacing - accumulatedDist;
+                segmentOffset += needed;
+
+                double t = segmentOffset / segmentLength;
+                Vec3d interpolated = p1.add(p2.subtract(p1).multiply(t));
+                resampled.add(interpolated);
+
+                accumulatedDist = 0.0;
+            }
+
+            accumulatedDist += (segmentLength - segmentOffset);
+        }
+
+        return resampled;
     }
 }
