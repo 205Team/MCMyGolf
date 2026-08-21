@@ -15,6 +15,7 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.registry.tag.BlockTags;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.state.StateManager;
+import net.minecraft.state.property.BooleanProperty;
 import net.minecraft.state.property.IntProperty;
 import net.minecraft.state.property.Properties;
 import net.minecraft.text.Text;
@@ -33,18 +34,22 @@ import net.minecraft.world.WorldView;
 import org.jetbrains.annotations.Nullable;
 
 public class FlagstickBlock extends BaseBlockWithEntity {
-    static int maxCount = 1;    //最大堆叠数量
+    static int maxCount = 1;
     public static final IntProperty ROTATION;
     protected static final VoxelShape SHAPE;
+    public static final BooleanProperty BEAM_TOGGLE = BooleanProperty.of("beam_toggle");
 
     static {
         ROTATION = Properties.ROTATION;
-        SHAPE = VoxelShapes.cuboid(0.4375, -1F, 0.4375, 0.5625, 2F, 0.5625);
+        SHAPE = VoxelShapes.cuboid(0.4375, -1F, 0.4375, 0.5625, 1F, 0.5625);
     }
 
     public FlagstickBlock(Settings settings) {
         super(settings);
-        this.setDefaultState(this.stateManager.getDefaultState().with(ROTATION, 0));
+        this.setDefaultState(this.stateManager.getDefaultState()
+                .with(ROTATION, 0)
+                .with(BEAM_TOGGLE, true)
+        );
     }
 
     //默认设置
@@ -75,10 +80,12 @@ public class FlagstickBlock extends BaseBlockWithEntity {
     @Override
     public ActionResult onUse(BlockState state, World world, BlockPos pos, PlayerEntity player, Hand hand, BlockHitResult hit) {
         if (!world.isClient) {
-            player.sendMessage(Text.of("这是一个红旗杆，用力插吧!"), false);
+            // Toggle the boolean state
+            boolean currentShowBeam = state.get(BEAM_TOGGLE);
+            world.setBlockState(pos, state.with(BEAM_TOGGLE, !currentShowBeam), Block.NOTIFY_ALL);
         }
 
-        return ActionResult.PASS;
+        return ActionResult.SUCCESS;
     }
 
     @Override
@@ -116,11 +123,9 @@ public class FlagstickBlock extends BaseBlockWithEntity {
     @Override
     public boolean canPlaceAt(BlockState state, WorldView world, BlockPos pos) {
         BlockPos downBlockPos = pos.down();
-        BlockPos upBlockPos = pos.up();
         BlockState downBlockState = world.getBlockState(downBlockPos);
-        BlockState upBlockState = world.getBlockState(upBlockPos);
-        // Place when air on top, dirt or farmland below
-        return upBlockState.isAir() && downBlockState.isIn(BlockTags.DIRT) || downBlockState.isOf(Blocks.FARMLAND);
+        // Place when dirt or farmland below
+        return downBlockState.isIn(BlockTags.DIRT) || downBlockState.isOf(Blocks.FARMLAND);
     }
 
     @Override
@@ -145,7 +150,7 @@ public class FlagstickBlock extends BaseBlockWithEntity {
 
     @Override
     protected void appendProperties(StateManager.Builder<Block, BlockState> builder) {
-        builder.add(ROTATION);
+        builder.add(ROTATION, BEAM_TOGGLE);
     }
 
     @Nullable

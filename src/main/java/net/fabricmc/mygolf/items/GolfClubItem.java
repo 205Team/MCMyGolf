@@ -25,7 +25,7 @@ import net.minecraft.world.World;
 
 public class GolfClubItem extends Item implements ItemAbstract {
 
-    public static final float[] LOFT_PRESETS = { -2.0f, -15.0f, -40.0f, -60.0f, -75.0f };   // Preset loft angles (Negative pitch = UP in Minecraft)
+    public static final float[] LOFT_PRESETS = { 0.0f, -15.0f, -40.0f, -60.0f, -75.0f };   // Preset loft angles (Negative pitch = UP in Minecraft)
     private static final int MAX_USE_TIME = 72000; // 定义蓄力的最长时间，单位为 tick
     public static final int MIN_CHARGE_TICKS = 5;  // * 0.05 seconds before a shot fires
     public static final int MAX_CHARGE_TICKS = 20; // * 0.05 seconds to reach 100% power

@@ -41,12 +41,36 @@ public class FlagstickEntityRenderer implements BlockEntityRenderer<FlagstickEnt
         BlockState blockState = flagstickEntity.getCachedState();
         VertexConsumer vertexConsumer = vertexConsumers.getBuffer(RenderLayer.getEntitySolid(textureID));
 
+        // --- Check Block Above ---
+        BlockPos posAbove = flagstickEntity.getPos().up();
+        boolean isObstructed = !world.getBlockState(posAbove).isAir();
+
         // --- Render Flagstick Model ---
         matrices.push();
         matrices.translate(0.5, 0.0, 0.5);
+
         float rotation = -((float) (blockState.get(FlagstickBlock.ROTATION) * 360) / 16.0F);
         matrices.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(rotation));
+
+        // Render Iron Stick
+        matrices.push();
+        if (isObstructed) {
+            float yBottom = -14.0F / 16.0F;         // -0.875 blocks (bottom of the stick)
+            float scaleY = (46.0F - 16.0F) / 46.0F; // 30px / 46px (subtracts exactly 1 block of height)
+
+            // Pivot scaling around the bottom of the stick
+            matrices.translate(0.0, yBottom, 0.0);
+            matrices.scale(1.0F, scaleY, 1.0F);
+            matrices.translate(0.0, -yBottom, 0.0);
+        }
         this.ironStick.render(matrices, vertexConsumer, light, overlay);
+        matrices.pop();
+
+        // Render Flag
+        matrices.push();
+        if (isObstructed) {
+            matrices.translate(0.0, -1.0, 0.0);
+        }
 
         long time = world.getTime();
         BlockPos blockPos = flagstickEntity.getPos();
@@ -55,30 +79,34 @@ public class FlagstickEntityRenderer implements BlockEntityRenderer<FlagstickEnt
         this.flag.render(matrices, vertexConsumer, light, overlay);
         matrices.pop();
 
-        // --- Render Beacon Beam ---
-        // RGB Color Float Array (Red, Green, Blue) -> Default White
-        matrices.push();
-        float speedFactor = 0.05f; // 20x slower
-        float continuousTime = (time + tickDelta) * speedFactor;
-        long customTime = (long) Math.floor(continuousTime);
-        float customTickDelta = continuousTime - customTime;
-        float[] color = new float[]{1.0F, 1.0F, 1.0F};
-        int beamHeight = 256; // How high the beam shoots up
-        BeaconBlockEntityRenderer.renderBeam(
-                matrices,
-                vertexConsumers,
-                FLAGSTICK_BEAM_TEXTURE,
-                customTickDelta,
-                0.05F,         // Height scale
-                customTime,
-                0,            // Y offset starting point
-                beamHeight,   // Maximum Y height
-                color,
-                0,        // Inner beam radius
-                0.375F         // Outer glow radius
-        );
         matrices.pop();
 
+        // --- Render Beacon Beam ---
+        // RGB Color Float Array (Red, Green, Blue) -> Default White
+        boolean showBeam = blockState.contains(FlagstickBlock.BEAM_TOGGLE) && blockState.get(FlagstickBlock.BEAM_TOGGLE);
+        if (showBeam) {
+            matrices.push();
+            float speedFactor = 0.05f; // 20x slower
+            float continuousTime = (time + tickDelta) * speedFactor;
+            long customTime = (long) Math.floor(continuousTime);
+            float customTickDelta = continuousTime - customTime;
+            float[] color = new float[]{1.0F, 1.0F, 1.0F};
+            int beamHeight = 256; // How high the beam shoots up
+            BeaconBlockEntityRenderer.renderBeam(
+                    matrices,
+                    vertexConsumers,
+                    FLAGSTICK_BEAM_TEXTURE,
+                    customTickDelta,
+                    0.05F,         // Height scale
+                    customTime,
+                    0,            // Y offset starting point
+                    beamHeight,   // Maximum Y height
+                    color,
+                    0,        // Inner beam radius
+                    0.375F         // Outer glow radius
+            );
+            matrices.pop();
+        }
     }
 
     // Made with Blockbench 4.5.2

@@ -8,6 +8,7 @@
   "item.mygolf.intro_book": "高尔夫球说明",
   "item.mygolf.flagstick_item": "红旗杆",
   "itemGroup.mygolf.golf_group": "高尔夫",
+  "entity.mygolf.golf_ball": "球",
   "sound.mygolf.golf_ball_hit": "高尔夫球击打",
   "sound.mygolf.golf_club_swing": "高尔夫球棒挥动"
 }

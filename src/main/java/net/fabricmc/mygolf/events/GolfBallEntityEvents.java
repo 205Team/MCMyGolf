@@ -100,7 +100,7 @@ public class GolfBallEntityEvents {
             if (entity instanceof GolfBallEntity ballEntity && !player.isSpectator()) {
                 if (hand == Hand.MAIN_HAND) {
                     ItemStack mainHandStack = player.getMainHandStack();
-                    ItemStack ballStack = createStackFromEntity(ballEntity);
+                    ItemStack ballStack = ballEntity.createStackFromEntity();
 
                     // 1. Pickup with Empty Hand
                     if (mainHandStack.isEmpty()) {
@@ -133,7 +133,6 @@ public class GolfBallEntityEvents {
         // 3. Block Collision Reaction (Sounds based on impact speed)
         ON_COLLISION.register((world, ball, pos, state, normal, speed) -> {
             if (!world.isClient() && speed > 0.1) {
-                System.out.println("collision!");   //Debug
                 world.playSound(
                         null,
                         pos,
@@ -143,6 +142,7 @@ public class GolfBallEntityEvents {
                         1.0F
                 );
             }
+            System.out.println("collision!");   //Debug
 
         });
 
@@ -170,33 +170,5 @@ public class GolfBallEntityEvents {
                 ball.setGoaled(true);
             }
         });
-    }
-
-    /**
-     * Creates an ItemStack from a GolfBallEntity preserving all NBT properties.
-     */
-    private static ItemStack createStackFromEntity(GolfBallEntity ballEntity) {
-        ItemStack ballStack = new ItemStack(RegisterItems.GOLF_BALL);
-
-        // Pass name
-        if (ballEntity.hasCustomName()) {
-            ballStack.setCustomName(ballEntity.getCustomName());
-        }
-        // Pass isgoal
-        if (ballEntity.isGoaled()) {
-            ballStack.getOrCreateNbt().putBoolean("IsGoaled", true);
-        }
-        // Pass hitcount
-        if (ballEntity.getHitCount() > 0) {
-            ballStack.getOrCreateNbt().putInt("HitCount", ballEntity.getHitCount());
-        }
-        // Pass color
-        int ballColor = ballEntity.getColor();
-        if (ballColor != -1 && ballColor != 0xFFFFFF && ballColor != 0xF9FFFE) {
-            RegisterItems.GOLF_BALL.setColor(ballStack, ballColor);
-        }
-        // Wipe empty NBT compound
-        GolfBall.sanitizeNbt(ballStack);
-        return ballStack;
     }
 }

@@ -19,26 +19,7 @@ public class GolfBallUIEvents {
     public static ClientTickEvents.EndTick golfBallArrowRenderEvent() {
         return client ->
         {
-            //视线投射击中对象
-            HitResult hit = client.crosshairTarget;
-            //玩家是否看向实体
-            if (hit != null && hit.getType() == HitResult.Type.ENTITY) {
-                EntityHitResult entityHit = (EntityHitResult) hit;
-                Entity entity = entityHit.getEntity();
-                //玩家是否看向高尔夫球
-                if (entity instanceof GolfBallEntity) {
-                    //渲染箭头
-                    if (!isPrevLookBall) {
-                        client.player.sendMessage(Text.of("look at ball"), true);
-                    }
-                    isPrevLookBall = true;
-                    return;
-                }
-            }
-            if (isPrevLookBall) {
-                client.player.sendMessage(Text.of("look away ball"), true);
-            }
-            isPrevLookBall = false;
+            //To do
         };
     }
 }

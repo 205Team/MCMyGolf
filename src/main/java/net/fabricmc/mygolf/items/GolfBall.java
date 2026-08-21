@@ -61,7 +61,6 @@ public class GolfBall extends BaseItem implements DyeableItem {
         }
 
         super.appendTooltip(stack, world, tooltip, context);
-        tooltip.add(Text.translatable("空手右键可回收").formatted(Formatting.GRAY));
     }
 
     //Right click to spawn golf ball

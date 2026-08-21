@@ -1,11 +1,11 @@
 package net.fabricmc.mygolf.entity;
 
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+import net.fabricmc.mygolf.items.GolfBall;
 import net.fabricmc.mygolf.physics.GolfPhysicsEngine;
 import net.fabricmc.mygolf.registry.RegisterItems;
-import net.fabricmc.mygolf.tools.DebugUtil;
 import net.minecraft.block.BlockState;
+import net.minecraft.block.Blocks;
+import net.minecraft.block.entity.PistonBlockEntity;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityDimensions;
 import net.minecraft.entity.EntityPose;
@@ -20,7 +20,10 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.particle.DustParticleEffect;
+import net.minecraft.particle.ParticleTypes;
+import net.minecraft.registry.tag.DamageTypeTags;
 import net.minecraft.server.world.ServerWorld;
+import net.minecraft.sound.SoundEvents;
 import net.minecraft.text.Text;
 import net.minecraft.util.ActionResult;
 import net.minecraft.util.Formatting;
@@ -32,9 +35,7 @@ import net.minecraft.world.RaycastContext;
 import net.minecraft.world.World;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
-
 import java.util.Comparator;
-import java.util.LinkedList;
 
 public class GolfBallEntity extends Entity {
 
@@ -63,9 +64,6 @@ public class GolfBallEntity extends Entity {
     public static final double MID_DISTANCE_SQ = MID_RADIUS * MID_RADIUS;
     public static final double MAX_DISTANCE_SQ = MAX_RADIUS * MAX_RADIUS;
 
-    @Environment(EnvType.CLIENT)
-    public final LinkedList<Vec3d> trailPositions = new LinkedList<>();    // Client-side list of trail points. Not synchronized to server.
-
     public GolfBallEntity(EntityType<? extends GolfBallEntity> entityType, World level) {
         super(entityType, level);
     }
@@ -82,10 +80,6 @@ public class GolfBallEntity extends Entity {
             this.setHitCount(this.getHitCount() + 1);
         }
 
-    }
-    public void restHitCount() {
-        this.setHitCount(0);
-        this.setGoaled(false);
     }
 
     public Vec3d getSpin() {
@@ -132,7 +126,7 @@ public class GolfBallEntity extends Entity {
 
         // 2. Run deterministic physics engine step
         GolfPhysicsEngine.State newState = GolfPhysicsEngine.step(
-                this.getWorld(), this, currentState, this.physicsConfig
+                this.getWorld(), this, currentState, this.physicsConfig, true
         );
 
         // Offset reverse back to entity feet position
@@ -144,6 +138,9 @@ public class GolfBallEntity extends Entity {
         this.setSpin(newState.spin());
         this.setOnGround(newState.onGround());
         this.velocityModified = true;
+
+        // Triggers block interactions
+        this.checkBlockCollision();
 
         // 4. Jump animation handling
         if (this.getJumpTicks() > 0) {
@@ -181,16 +178,37 @@ public class GolfBallEntity extends Entity {
             spawnTrailParticles();
 
             // Debug
-            if(this.age % 48 == 0) {
-                System.out.printf("[Tick %d] Vel: [X: %.4f, Y: %.4f, Z: %.4f] | Pos [X: %.4f, Y: %.4f, Z: %.4f] | Rot [X: %.4f, Y: %.4f, Z: %.4f, W: %.4f]%n",
-                        this.age, vel.x, vel.y, vel.z, entityFeetPos.x, entityFeetPos.y, entityFeetPos.z, this.worldRotation.x, this.worldRotation.y, this.worldRotation.z, this.worldRotation.w);
-            }
-            DebugUtil.logOnChange("ball is on ground", this.isOnGround());
+//            if(this.age % 1 == 0) {
+//                System.out.printf("[Tick %d] Vel: [X: %.4f, Y: %.4f, Z: %.4f] | Pos [X: %.4f, Y: %.4f, Z: %.4f] | Rot [X: %.4f, Y: %.4f, Z: %.4f, W: %.4f]%n",
+//                        this.age, vel.x, vel.y, vel.z, entityFeetPos.x, entityFeetPos.y, entityFeetPos.z, this.worldRotation.x, this.worldRotation.y, this.worldRotation.z, this.worldRotation.w);
+//            }
+//            DebugUtil.logOnChange("ball is on ground", this.isOnGround());
 
         } else {
             /**
              * Server-side Logic
              */
+            BlockPos ballCenterPos = BlockPos.ofFloored(this.getPos().add(0, radius, 0));
+            BlockState stateAtBall = this.getWorld().getBlockState(ballCenterPos);
+
+            if (!stateAtBall.isAir()&& stateAtBall.getFluidState().isEmpty()) {
+                if (stateAtBall.isOf(Blocks.MOVING_PISTON)) {
+                    // Apply impulse if piston pushes
+                    if (this.getWorld().getBlockEntity(ballCenterPos) instanceof PistonBlockEntity piston) {
+                        Direction pushDir = piston.getMovementDirection();
+                        double launchSpeed = 0.8D;
+
+                        Vec3d impulse = Vec3d.of(pushDir.getVector()).multiply(launchSpeed);
+                        this.applyImpulse(impulse);
+                        return;
+                    }
+                } else if (!stateAtBall.getCollisionShape(this.getWorld(), ballCenterPos).isEmpty()) {
+                    // Drop as item if the ball is buried/inside a placed block
+                    this.dropStack(this.createStackFromEntity());
+                    this.discard();
+                    return;
+                }
+            }
 
             // Chunk loading logic
             if (this.getWorld() instanceof ServerWorld serverWorld) {
@@ -343,11 +361,28 @@ public class GolfBallEntity extends Entity {
     protected void fall(double d, boolean bl, BlockState blockState, BlockPos blockPos) {
     }
 
-    //Entity → Item
+    // Drop when hit 3 times (Entity → Item)
     @Override
     public boolean damage(DamageSource source, float amount) {
         if (this.getWorld().isClient() || this.isRemoved()) return false;
         if (this.isInvulnerableTo(source)) return false;
+
+        // Destroy the ball immediately without dropping an item if burned
+        if (source.isIn(DamageTypeTags.IS_FIRE)) {
+            this.getWorld().playSound(
+                    null, this.getX(), this.getY(), this.getZ(),
+                    SoundEvents.ENTITY_GENERIC_BURN, this.getSoundCategory(), 0.8F, 1.0F
+            );
+            if (this.getWorld() instanceof ServerWorld serverWorld) {
+                serverWorld.spawnParticles(
+                        ParticleTypes.SMOKE,
+                        this.getX(), this.getY() + 0.1, this.getZ(),
+                        8, 0.05, 0.05, 0.05, 0.02
+                );
+            }
+            this.discard();
+            return true;
+        }
 
         // Each hit stacks +0.5 ball height
         float nextHeight = this.getHopHeight() + (0.5F * BALL_HEIGHT);
@@ -377,6 +412,32 @@ public class GolfBallEntity extends Entity {
         this.scheduleVelocityUpdate();
 
         return true;
+    }
+
+    //Entity → Item
+    public ItemStack createStackFromEntity() {
+        ItemStack ballStack = new ItemStack(RegisterItems.GOLF_BALL);
+
+        // Pass name
+        if (this.hasCustomName()) {
+            ballStack.setCustomName(this.getCustomName());
+        }
+        // Pass isgoal
+        if (this.isGoaled()) {
+            ballStack.getOrCreateNbt().putBoolean("IsGoaled", true);
+        }
+        // Pass hitcount
+        if (this.getHitCount() > 0) {
+            ballStack.getOrCreateNbt().putInt("HitCount", this.getHitCount());
+        }
+        // Pass color
+        int ballColor = this.getColor();
+        if (ballColor != -1 && ballColor != 0xFFFFFF && ballColor != 0xF9FFFE) {
+            RegisterItems.GOLF_BALL.setColor(ballStack, ballColor);
+        }
+        // Wipe empty NBT compound
+        GolfBall.sanitizeNbt(ballStack);
+        return ballStack;
     }
 
     // Give Name Tag
@@ -417,7 +478,7 @@ public class GolfBallEntity extends Entity {
             return Text.empty().append(this.getCustomName()).append(hitText);
         } else {
             // Default: "Golf Ball (Hits: 3)"
-            return Text.literal("ball").append(hitText);
+            return Text.translatable("entity.mygolf.golf_ball").append(hitText);
         }
     }
 

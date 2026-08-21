@@ -25,7 +25,8 @@ public class GolfPhysicsEngine {
             double restitution,
             double dragCoefficient,
             double gravity,
-            double liftCoefficient
+            double liftCoefficient,
+            double buoyancy
     ) {
         public static final Config STANDARD_BALL = new Config(
                 0.045,
@@ -33,7 +34,8 @@ public class GolfPhysicsEngine {
                 0.6,
                 0.985,
                 0.035,
-                0.01
+                0.01,
+                0.028
         );
     }
 
@@ -42,7 +44,7 @@ public class GolfPhysicsEngine {
     /**
      * Integrates one tick of flight, drag, Magnus forces, and continuous collision response.
      */
-    public static State step(World world, GolfBallEntity ball, State current, Config config) {
+    public static State step(World world, GolfBallEntity ball, State current, Config config, boolean isRealTick) {
         Vec3d vel = current.vel();
         Vec3d spin = current.spin();
         Vec3d pos = current.pos();
@@ -64,15 +66,31 @@ public class GolfPhysicsEngine {
 
             if (newVel.lengthSquared() < 0.0001) {
                 // Check hole entry when stationary
-                checkHoleEntry(world, ball);
+                if (isRealTick) {
+                    checkHoleEntry(world, ball);
+                }
                 return new State(pos, Vec3d.ZERO, Vec3d.ZERO, true);
             }
         } else {
-            // Air Physics: Air resistance (drag) + Gravity + Magnus force (curve lift from spin)
-            Vec3d magnusForce = GolfBallEntity.ENABLE_MAGNUS_EFFECT
-                    ? spin.crossProduct(vel).multiply(config.liftCoefficient())
-                    : Vec3d.ZERO;
-            newVel = vel.multiply(config.dragCoefficient()).add(0, -config.gravity(), 0).add(magnusForce);
+            // Check if the center of the ball is submerged in a liquid
+            BlockPos currentPos = BlockPos.ofFloored(pos);
+            boolean isInFluid = !world.getFluidState(currentPos).isEmpty();
+
+            if (isInFluid) {
+                // Fluid Physics: Heavy drag + Buoyancy lift
+                double fluidDrag = 0.82;     // High resistance (slows down fast entries)
+
+                // Effective gravity in water = downward gravity + upward buoyancy
+                double netGravity = -config.gravity() + config.buoyancy(); // Default: -0.035 + 0.028 = -0.007
+
+                newVel = vel.multiply(fluidDrag).add(0, netGravity, 0);
+            } else {
+                // Air Physics: Standard drag + Gravity + Magnus force
+                Vec3d magnusForce = GolfBallEntity.ENABLE_MAGNUS_EFFECT
+                        ? spin.crossProduct(vel).multiply(config.liftCoefficient())
+                        : Vec3d.ZERO;
+                newVel = vel.multiply(config.dragCoefficient()).add(0, -config.gravity(), 0).add(magnusForce);
+            }
         }
 
         // 3. Substep movement (prevents fast balls from skipping over block borders)
@@ -140,9 +158,11 @@ public class GolfPhysicsEngine {
                 }
 
                 // Trigger collision events
-                GolfBallEntityEvents.ON_COLLISION.invoker().onCollision(
-                        world, ball, impactBlockPos, world.getBlockState(impactBlockPos), normal, impactSpeed
-                );
+                if(isRealTick){
+                    GolfBallEntityEvents.ON_COLLISION.invoker().onCollision(
+                            world, ball, impactBlockPos, world.getBlockState(impactBlockPos), normal, impactSpeed
+                    );
+                }
 
                 // Update intermediate variables for next substep iteration
                 currentCenter = adjustedPos;
@@ -318,35 +338,35 @@ public class GolfPhysicsEngine {
     public static double getSurfaceRestitution(World world, BlockPos pos) {
         BlockState state = world.getBlockState(pos);
 
-        // 1. Extreme Bounce (Arcade/Special)
-        if (state.isOf(Blocks.SLIME_BLOCK)) return 0.95;
-
-        // 2. Ice (Very Slick & Elastic) - Covers Ice, Packed Ice, Blue Ice
-        if (state.isIn(BlockTags.ICE)) return 0.80;
-
-        // 3. Hard Surfaces (Stone, Concrete, Metal, Wood, Bricks)
-        if (state.isIn(BlockTags.STONE_BRICKS) || state.isIn(BlockTags.BASE_STONE_OVERWORLD) ||
-                state.isIn(BlockTags.PLANKS) || state.isOf(Blocks.COPPER_BLOCK) || state.isOf(Blocks.IRON_BLOCK)) {
-            return 0.70;
-        }
-
-        // 4. Grass & Turf (Fairway / Greens)
+        // Grass & Turf (Fairway / Greens)
         if (state.isOf(Blocks.GRASS_BLOCK) || state.isOf(Blocks.MOSS_BLOCK) ||
                 state.isOf(Blocks.MYCELIUM) || state.isIn(BlockTags.WOOL_CARPETS)) {
             return 0.55;
         }
 
-        // 5. Dirt & Mud (Rough) - Absorbs more kinetic energy than fairway grass
+        // Dirt & Mud (Rough) - Absorbs more kinetic energy than fairway grass
         if (state.isIn(BlockTags.DIRT) || state.isOf(Blocks.MUD) || state.isOf(Blocks.FARMLAND)) {
             return 0.35;
         }
 
-        // 6. Soft Dampeners (Wool, Snow)
+        // Ice (Very Slick & Elastic) - Covers Ice, Packed Ice, Blue Ice
+        if (state.isIn(BlockTags.ICE)) return 0.80;
+
+        // Hard Surfaces (Stone, Concrete, Metal, Wood, Bricks)
+        if (state.isIn(BlockTags.STONE_BRICKS) || state.isIn(BlockTags.BASE_STONE_OVERWORLD) ||
+                state.isIn(BlockTags.PLANKS) || state.isOf(Blocks.COPPER_BLOCK) || state.isOf(Blocks.IRON_BLOCK)) {
+            return 0.70;
+        }
+
+        // Extreme Bounce (Arcade/Special)
+        if (state.isOf(Blocks.SLIME_BLOCK)) return 0.95;
+
+        // Soft Dampeners (Wool, Snow)
         if (state.isIn(BlockTags.WOOL) || state.isIn(BlockTags.SNOW)) {
             return 0.25;
         }
 
-        // 7. Bunkers & Tree Canopies (Absorbs nearly all kinetic energy)
+        // Bunkers & Tree Canopies (Absorbs nearly all kinetic energy)
         if (state.isIn(BlockTags.SAND) || state.isIn(BlockTags.LEAVES)) {
             return 0.10;
         }
@@ -384,7 +404,7 @@ public class GolfPhysicsEngine {
         points.add(current.pos().subtract(0, config.radius(), 0));
 
         for (int i = 0; i < maxSteps; i++) {
-            current = step(world, ball, current, config);
+            current = step(world, ball, current, config, false);
 
             // Convert all predicted steps back to feet positions
             points.add(current.pos().subtract(0, config.radius(), 0));

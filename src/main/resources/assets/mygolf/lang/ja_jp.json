@@ -1,0 +1,14 @@
+{
+  "block.mygolf.golf_ball": "ゴルフボール",
+  "block.mygolf.flagstick_block": "フラグスティックブロック",
+  "block.mygolf.golf_hole": "ゴルフホール",
+  "item.mygolf.golf_club_item": "ゴルフクラブ",
+  "item.mygolf.iron_stick": "アイアンスティック",
+  "item.mygolf.golf_ball": "ゴルフボール",
+  "item.mygolf.intro_book": "ゴルフ入門書",
+  "item.mygolf.flagstick_item": "フラグスティック",
+  "itemGroup.mygolf.golf_group": "ゴルフ",
+  "entity.mygolf.golf_ball": "ボール",
+  "sound.mygolf.golf_ball_hit": "ゴルフボール打撃音",
+  "sound.mygolf.golf_club_swing": "ゴルフクラブスイング音"
+}

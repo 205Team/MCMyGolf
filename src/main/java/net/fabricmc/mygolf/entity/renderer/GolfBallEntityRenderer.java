@@ -48,7 +48,7 @@ public class GolfBallEntityRenderer extends EntityRenderer<GolfBallEntity> {
         ClientPlayerEntity player = MinecraftClient.getInstance().player;
         if (player == null) return;
 
-        // Render 2D textured arrow flat on ground
+        // Render 2D textured aiming arrow
         renderAimArrow(ballEntity, player, tickDelta, matrixStack, vertexConsumers, light);
         // Render trajectory preview while charging club
         renderTrajectoryPreview(ballEntity, player, tickDelta, matrixStack, vertexConsumers, light);
@@ -136,7 +136,7 @@ public class GolfBallEntityRenderer extends EntityRenderer<GolfBallEntity> {
         float radius = 0.10F;
         float height = 0.15F;
         int segments = 6; // Increase for smoother cone, decrease for performance/blocky style
-        int r = 255, g = 40, b = 40, a = 255; // Red color
+        int r = 255, g = 70, b = 70, a = 255; // Red color
 
         // 4. Render Cone Side Walls (Tip at 0,0,0 pointing DOWN)
         for (int i = 0; i < segments; i++) {

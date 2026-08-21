@@ -8,6 +8,7 @@
   "item.mygolf.intro_book": "Golf Ball Introduction",
   "item.mygolf.flagstick_item": "Flagstick",
   "itemGroup.mygolf.golf_group": "Golf",
+  "entity.mygolf.golf_ball": "Ball",
   "sound.mygolf.golf_ball_hit": "Golf Ball Hit",
   "sound.mygolf.golf_club_swing": "Golf Club Swing"
 }
