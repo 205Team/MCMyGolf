@@ -10,5 +10,9 @@
   "itemGroup.mygolf.golf_group": "Golf",
   "entity.mygolf.golf_ball": "Ball",
   "sound.mygolf.golf_ball_hit": "Golf Ball Hit",
-  "sound.mygolf.golf_club_swing": "Golf Club Swing"
+  "sound.mygolf.golf_club_swing": "Golf Club Swing",
+  "book.mygolf.guide.filtterd_title": "Golf Guide",
+  "book.mygolf.guide.title": "Golf Instructions",
+  "book.mygolf.guide.page1": "\n\n\n\n§4Golf Guide\n§6Rules: Swing your club to hit the ball into the hole at the red flagstick",
+  "book.mygolf.guide.page2": "§3Golf Ball\n§6Right-click to place.\n§6Right-click ball entity empty-handed or holding a golf ball to retrieve.\n\n§3Flagstick\n§6Use on dirt or grass blocks.\n§6Golf Club\n§6Near a golf ball, Sneak and right-click to change loft,\n§6Right-click to charge a shot."
 }

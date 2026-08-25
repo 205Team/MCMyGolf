@@ -142,7 +142,8 @@ public class GolfBallEntityEvents {
                         1.0F
                 );
             }
-            System.out.println("collision!");   //Debug
+            System.out.printf("collision at Pos [X: %d, Y: %d, Z: %d]", pos.getX(),pos.getY(),pos.getZ());   //Debug
+            System.out.println(state);   //Debug
 
         });
 

@@ -1,15 +1,14 @@
 package net.fabricmc.mygolf.entity;
 
+import net.fabricmc.mygolf.global.ModConfig;
 import net.fabricmc.mygolf.items.GolfBall;
 import net.fabricmc.mygolf.physics.GolfPhysicsEngine;
 import net.fabricmc.mygolf.registry.RegisterItems;
+import net.fabricmc.mygolf.tools.DebugUtil;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.Blocks;
 import net.minecraft.block.entity.PistonBlockEntity;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.EntityDimensions;
-import net.minecraft.entity.EntityPose;
-import net.minecraft.entity.EntityType;
+import net.minecraft.entity.*;
 import net.minecraft.entity.damage.DamageSource;
 import net.minecraft.entity.damage.DamageTypes;
 import net.minecraft.entity.data.DataTracker;
@@ -43,13 +42,13 @@ public class GolfBallEntity extends Entity {
     private ChunkPos lastForcedChunk = null;    // Last forced load chunk for traveling ball
     public final Quaternionf prevWorldRotation = new Quaternionf(); // For rendering rotation
     public final Quaternionf worldRotation = new Quaternionf(); // For rendering rotation
-    public Vec3d spinVector = Vec3d.ZERO;
-    public static boolean ENABLE_MAGNUS_EFFECT = true;  // Toggle for Magnus effect(curveballs)
+    public static boolean ENABLE_MAGNUS_EFFECT = ModConfig.INSTANCE.enableMagnusEffect;  // Toggle for Magnus effect(curveballs)
     private static final double SPEED_THRESHOLD_SQ = 0.5; // Minimum speed squared to spawn trail
     private static final double FADE_WINDOW_SQ = 0.25;     // Speed range above threshold over which fading occurs
     public static final EntityDimensions BALL_DIMENSIONS = EntityDimensions.fixed(0.25f, 0.25f); // Minecraft's collision box dimensions of ball
     public static final float BALL_HEIGHT = BALL_DIMENSIONS.height; // Jumpy animation ball height
     public static final float DROP_THRESHOLD = 1.5F * BALL_HEIGHT;  // Ball item-drop height
+    private static final TrackedData<Vector3f> SPIN_VECTOR = DataTracker.registerData(GolfBallEntity.class, TrackedDataHandlerRegistry.VECTOR3F);
     private static final TrackedData<Boolean> IS_GOALED = DataTracker.registerData(GolfBallEntity.class, TrackedDataHandlerRegistry.BOOLEAN);
     private static final TrackedData<Integer> HIT_COUNT = DataTracker.registerData(GolfBallEntity.class, TrackedDataHandlerRegistry.INTEGER); // Counts how many times the ball has got hit
     private static final TrackedData<Integer> COLOR = DataTracker.registerData(GolfBallEntity.class, TrackedDataHandlerRegistry.INTEGER);
@@ -83,10 +82,11 @@ public class GolfBallEntity extends Entity {
     }
 
     public Vec3d getSpin() {
-        return this.spinVector;
+        Vector3f vec = this.dataTracker.get(SPIN_VECTOR);
+        return new Vec3d(vec.x(), vec.y(), vec.z());
     }
     public void setSpin(Vec3d spin) {
-        this.spinVector = spin;
+        this.dataTracker.set(SPIN_VECTOR, new Vector3f((float) spin.x, (float) spin.y, (float) spin.z));
     }
 
     public boolean isGoaled() {
@@ -120,7 +120,7 @@ public class GolfBallEntity extends Entity {
         GolfPhysicsEngine.State currentState = new GolfPhysicsEngine.State(
                 centerPos,
                 this.getVelocity(),
-                this.spinVector,
+                this.getSpin(),
                 this.isOnGround()
         );
 
@@ -137,7 +137,6 @@ public class GolfBallEntity extends Entity {
         this.setVelocity(newState.vel());
         this.setSpin(newState.spin());
         this.setOnGround(newState.onGround());
-        this.velocityModified = true;
 
         // Triggers block interactions
         this.checkBlockCollision();
@@ -156,6 +155,7 @@ public class GolfBallEntity extends Entity {
              * Client-side Visuals
              */
             Vec3d vel = this.getVelocity();
+            Vec3d activeSpin = this.getSpin();
             this.prevWorldRotation.set(this.worldRotation);
             double horizontalSpeed = Math.sqrt(vel.x * vel.x + vel.z * vel.z);
 
@@ -165,9 +165,9 @@ public class GolfBallEntity extends Entity {
                 float axisZ = (float) (-vel.x / horizontalSpeed);
                 Quaternionf deltaRotation = new Quaternionf().rotationAxis(rollAngle, axisX, 0.0f, axisZ);
                 deltaRotation.mul(this.worldRotation, this.worldRotation);
-            } else if (this.spinVector.lengthSquared() > 0.0001) {
-                double spinSpeed = this.spinVector.length();
-                Vec3d spinAxis = this.spinVector.normalize();
+            } else if (activeSpin.lengthSquared() > 0.0001) {
+                double spinSpeed = activeSpin.length();
+                Vec3d spinAxis = activeSpin.normalize();
                 Quaternionf deltaRotation = new Quaternionf().rotationAxis(
                         (float) spinSpeed, (float) spinAxis.x, (float) spinAxis.y, (float) spinAxis.z
                 );
@@ -182,7 +182,7 @@ public class GolfBallEntity extends Entity {
 //                System.out.printf("[Tick %d] Vel: [X: %.4f, Y: %.4f, Z: %.4f] | Pos [X: %.4f, Y: %.4f, Z: %.4f] | Rot [X: %.4f, Y: %.4f, Z: %.4f, W: %.4f]%n",
 //                        this.age, vel.x, vel.y, vel.z, entityFeetPos.x, entityFeetPos.y, entityFeetPos.z, this.worldRotation.x, this.worldRotation.y, this.worldRotation.z, this.worldRotation.w);
 //            }
-//            DebugUtil.logOnChange("ball is on ground", this.isOnGround());
+            DebugUtil.logOnChange("ball is on ground", this.isOnGround());
 
         } else {
             /**
@@ -202,7 +202,7 @@ public class GolfBallEntity extends Entity {
                         this.applyImpulse(impulse);
                         return;
                     }
-                } else if (!stateAtBall.getCollisionShape(this.getWorld(), ballCenterPos).isEmpty()) {
+                } else if (stateAtBall.shouldSuffocate(this.getWorld(), ballCenterPos)) {
                     // Drop as item if the ball is buried/inside a placed block
                     this.dropStack(this.createStackFromEntity());
                     this.discard();
@@ -401,7 +401,12 @@ public class GolfBallEntity extends Entity {
             } else {
                 RegisterItems.GOLF_BALL.removeColor(ballStack); // Ensures clean, stackable item
             }
-            this.dropStack(ballStack);
+
+            ItemEntity itemEntity = this.dropStack(ballStack);
+            if (itemEntity != null) {
+                itemEntity.setVelocity(0, 0.3, 0);
+                itemEntity.velocityModified = true; // Notifies client of velocity change
+            }
             this.discard();
             return true;
         }
@@ -527,6 +532,7 @@ public class GolfBallEntity extends Entity {
         this.dataTracker.startTracking(COLOR, 0xFFFFFF);
         this.dataTracker.startTracking(HIT_COUNT, 0);
         this.dataTracker.startTracking(IS_GOALED, false);
+        this.dataTracker.startTracking(SPIN_VECTOR, new Vector3f(0.0f, 0.0f, 0.0f));
     }
 
     @Override

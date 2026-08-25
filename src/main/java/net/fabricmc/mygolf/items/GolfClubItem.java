@@ -4,6 +4,7 @@ import net.fabricmc.mygolf.MyGolfModClient;
 import net.fabricmc.mygolf.entity.GolfBallEntity;
 import net.fabricmc.mygolf.items.base.ItemAbstract;
 import net.fabricmc.mygolf.registry.RegisterSounds;
+import net.fabricmc.mygolf.tools.DebugUtil;
 import net.fabricmc.mygolf.tools.StringTool;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.player.PlayerEntity;
@@ -102,16 +103,16 @@ public class GolfClubItem extends Item implements ItemAbstract {
 
                     // Backspin scales with shot speed and loft angle steepness
                     double loftMagnitude = Math.abs(currentLoft); // e.g. 5.0 to 75.0
-                    double backspinIntensity = finalSpeed * Math.sin(Math.toRadians(loftMagnitude)) * 0.15;
+                    double backspinIntensity = finalSpeed * Math.sin(Math.toRadians(loftMagnitude)) * 1.5;
 
                     // Transform local shot spin to world-space spin vector
                     // Perpendicular axis relative to player facing direction:
                     double backspinX = -Math.cos(yawRad) * backspinIntensity;
                     double backspinZ = -Math.sin(yawRad) * backspinIntensity;
 
-                    targetBall.spinVector = new Vec3d(backspinX, 0.0, backspinZ);
+                    targetBall.setSpin(new Vec3d(backspinX, 0.0, backspinZ));
                 } else {
-                    targetBall.spinVector = Vec3d.ZERO;
+                    targetBall.setSpin(Vec3d.ZERO);
                 }
                 playHitSound(world, player);
 

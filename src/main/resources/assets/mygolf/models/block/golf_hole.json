@@ -4,7 +4,7 @@
 	"texture_size": [32, 32],
 	"textures": {
 		"1": "mygolf:block/golf_hole",
-		"particle": "#1",
+		"particle": "mygolf:block/golf_hole",
 		"overlay": "mygolf:block/golf_hole_side_overlay"
 	},
 	"elements": [
@@ -12,12 +12,12 @@
 			"from": [0, 0, 0],
 			"to": [16, 2, 16],
 			"faces": {
-				"north": {"uv": [0, 15, 8, 16], "texture": "#1"},
-				"east": {"uv": [0, 15, 8, 16], "texture": "#1"},
-				"south": {"uv": [0, 15, 8, 16], "texture": "#1"},
-				"west": {"uv": [0, 15, 8, 16], "texture": "#1"},
+				"north": {"uv": [0, 15, 8, 16], "texture": "#1", "cullface": "north"},
+				"east": {"uv": [0, 15, 8, 16], "texture": "#1", "cullface": "east"},
+				"south": {"uv": [0, 15, 8, 16], "texture": "#1", "cullface": "south"},
+				"west": {"uv": [0, 15, 8, 16], "texture": "#1", "cullface": "west"},
 				"up": {"uv": [8, 8, 16, 16], "texture": "#1"},
-				"down": {"uv": [0, 0, 8, 8], "texture": "#1"}
+				"down": {"uv": [0, 0, 8, 8], "texture": "#1", "cullface": "down"}
 			}
 		},
 		{
@@ -25,30 +25,23 @@
 			"to": [16, 16, 2],
 			"faces": {
 				"south": {"uv": [8, 0, 16, 7], "texture": "#1"},
-				"up": {"uv": [16, 16, 8, 15], "texture": "#1", "tintindex": 0},
-				"down": {"uv": [8, 7, 0, 8], "texture": "#1"}
+				"up": {"uv": [16, 16, 8, 15], "texture": "#1", "cullface": "up", "tintindex": 0}
 			}
 		},
 		{
 			"from": [0, 2, 2],
 			"to": [2, 16, 14],
 			"faces": {
-				"north": {"uv": [7, 1, 8, 7], "texture": "#1"},
 				"east": {"uv": [9, 0, 15, 7], "texture": "#1"},
-				"south": {"uv": [7, 1, 8, 7], "texture": "#1"},
-				"up": {"uv": [15, 9, 16, 15], "texture": "#1", "tintindex": 0},
-				"down": {"uv": [7, 1, 8, 7], "texture": "#1"}
+				"up": {"uv": [15, 9, 16, 15], "texture": "#1", "cullface": "up", "tintindex": 0}
 			}
 		},
 		{
 			"from": [14, 2, 2],
 			"to": [16, 16, 14],
 			"faces": {
-				"north": {"uv": [0, 1, 1, 7], "texture": "#1"},
-				"south": {"uv": [0, 1, 1, 7], "texture": "#1"},
-				"west": {"uv": [8.5, 0, 15.5, 7], "texture": "#1"},
-				"up": {"uv": [8, 9, 9, 15], "texture": "#1", "tintindex": 0},
-				"down": {"uv": [0, 1, 1, 7], "texture": "#1"}
+				"west": {"uv": [9, 0, 15, 7], "texture": "#1"},
+				"up": {"uv": [8, 9, 9, 15], "texture": "#1", "cullface": "up", "tintindex": 0}
 			}
 		},
 		{
@@ -56,28 +49,27 @@
 			"to": [16, 16, 16],
 			"faces": {
 				"north": {"uv": [8, 0, 16, 7], "texture": "#1"},
-				"up": {"uv": [8, 8, 16, 9], "texture": "#1", "tintindex": 0},
-				"down": {"uv": [0, 0, 8, 1], "texture": "#1"}
+				"up": {"uv": [8, 8, 16, 9], "texture": "#1", "cullface": "up", "tintindex": 0}
 			}
 		},
 		{
-			"from": [0, 0, 0],
+			"from": [0, 2, 0],
 			"to": [16, 16, 16],
 			"faces": {
-				"north": {"uv": [0, 0, 8, 8], "texture": "#1", "cullface": "north"},
-				"east": {"uv": [0, 0, 8, 8], "texture": "#1", "cullface": "east"},
-				"south": {"uv": [0, 0, 8, 8], "texture": "#1", "cullface": "south"},
-				"west": {"uv": [0, 0, 8, 8], "texture": "#1", "cullface": "west"}
+				"north": {"uv": [0, 0, 8, 7], "texture": "#1", "cullface": "north"},
+				"east": {"uv": [0, 0, 8, 7], "texture": "#1", "cullface": "east"},
+				"south": {"uv": [0, 0, 8, 7], "texture": "#1", "cullface": "south"},
+				"west": {"uv": [0, 0, 8, 7], "texture": "#1", "cullface": "west"}
 			}
 		},
 		{
-			"from": [0, 0, 0],
+			"from": [0, 2, 0],
 			"to": [16, 16, 16],
 			"faces": {
-				"north": {"uv": [0, 0, 16, 16], "texture": "#overlay", "cullface": "north", "tintindex": 0},
-				"east": {"uv": [0, 0, 16, 16], "texture": "#overlay", "cullface": "east", "tintindex": 0},
-				"south": {"uv": [0, 0, 16, 16], "texture": "#overlay", "cullface": "south", "tintindex": 0},
-				"west": {"uv": [0, 0, 16, 16], "texture": "#overlay", "cullface": "west", "tintindex": 0}
+				"north": {"uv": [0, 0, 16, 14], "texture": "#overlay", "cullface": "north", "tintindex": 0},
+				"east": {"uv": [0, 0, 16, 14], "texture": "#overlay", "cullface": "east", "tintindex": 0},
+				"south": {"uv": [0, 0, 16, 14], "texture": "#overlay", "cullface": "south", "tintindex": 0},
+				"west": {"uv": [0, 0, 16, 14], "texture": "#overlay", "cullface": "west", "tintindex": 0}
 			}
 		}
 	]

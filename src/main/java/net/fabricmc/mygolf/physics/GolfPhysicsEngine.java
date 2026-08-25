@@ -8,6 +8,7 @@ import net.minecraft.block.Blocks;
 import net.minecraft.registry.tag.BlockTags;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Box;
+import net.minecraft.util.math.Direction;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.util.shape.VoxelShape;
 import net.minecraft.world.World;
@@ -50,9 +51,17 @@ public class GolfPhysicsEngine {
         Vec3d pos = current.pos();
         boolean onGround = current.onGround();
 
-        // 1. Verify ground support before applying velocity
-        if (onGround && (vel.y > 0.01 || !hasGroundSupport(world, pos, config.radius()))) {
-            onGround = false;
+        // 1. Determine ground support status before velocity calculations
+        boolean hasGround = hasGroundSupport(world, pos, config.radius());
+        if (onGround) {
+            if (vel.y > 0.01 || !hasGround) {
+                onGround = false;
+            }
+        } else {
+            // Promote freshly spawned or landing entities to ground state if supported
+            if (hasGround && Math.abs(vel.y) < 0.08) {
+                onGround = true;
+            }
         }
 
         // 2. Calculate new tick velocity
@@ -63,6 +72,10 @@ public class GolfPhysicsEngine {
 
             // Decelerate horizontal sliding velocity using ground friction
             newVel = new Vec3d(vel.x * groundFriction, 0, vel.z * groundFriction);
+
+            // Convert linear ground velocity into angular velocity vector (spinVector)
+            double radius = config.radius();
+            spin = new Vec3d(newVel.z / radius, 0, -newVel.x / radius);
 
             if (newVel.lengthSquared() < 0.0001) {
                 // Check hole entry when stationary
@@ -131,7 +144,7 @@ public class GolfPhysicsEngine {
                 double tangentSpeed = tangentVel.length();
 
                 Vec3d reflectedTangent = tangentVel;
-                if (tangentSpeed > 0.0001 && normalDot < 0) {
+                if (tangentSpeed > 0.0001 && normalDot < 0 && !currentlyOnGround) {
                     double frictionFactor = Math.max(0.65, 1.0 - (maxFrictionImpulse / tangentSpeed));
                     reflectedTangent = tangentVel.multiply(frictionFactor);
                 }
@@ -139,19 +152,20 @@ public class GolfPhysicsEngine {
                 // Combine normal and tangent responses to form total bounce direction
                 Vec3d reflectedVel = reflectedNormal.add(reflectedTangent);
 
-                // Push ball slightly out of block skin (0.001) to prevent getting stuck in face
-                Vec3d adjustedPos = collision.resolvedPos().add(normal.multiply(0.001));
+                Vec3d adjustedPos = collision.resolvedPos();
 
                 // Determine if landing hit converts airborne state to ground rolling state
-                boolean hasGround = hasGroundSupport(world, adjustedPos, config.radius());
+                hasGround = hasGroundSupport(world, adjustedPos, config.radius());
                 double verticalImpactSpeed = Math.abs(normalVel.y);
                 boolean lowVelocityImpact = verticalImpactSpeed < 0.08;
-
                 boolean landsOnGround = normal.y > 0.7 && hasGround && lowVelocityImpact;
 
                 if (landsOnGround) {
                     // Ball is moving slowly enough vertically to settle into a ground roll
-                    reflectedVel = new Vec3d(reflectedVel.x * surfaceFriction, 0, reflectedVel.z * surfaceFriction);
+                    currentlyOnGround = true;
+                    if (!onGround) {
+                        reflectedVel = new Vec3d(reflectedVel.x * surfaceFriction, 0, reflectedVel.z * surfaceFriction);
+                    }
                 } else {
                     // Preserve calculated vertical bounce from normalVel * -surfaceBounciness
                     currentlyOnGround = false;
@@ -174,7 +188,7 @@ public class GolfPhysicsEngine {
                     currentVel = Vec3d.ZERO;
                     break;
                 }
-                stepVel = currentVel.multiply(1.0 / (substeps - i));
+                stepVel = currentVel.multiply(1.0 / substeps);
             } else {
                 // Free movement: No hit detected, move forward
                 currentCenter = nextCenter;
@@ -216,84 +230,78 @@ public class GolfPhysicsEngine {
      * Collision helper
      */
     public static SphereCollision resolveSphereCollision(World world, Vec3d intendedCenter, Vec3d previousCenter, double radius) {
-        // 1. Broadphase: Create an AABB encompassing the sphere to fetch blocks
-
         Box searchBox = new Box(
                 intendedCenter.x - radius, intendedCenter.y - radius, intendedCenter.z - radius,
                 intendedCenter.x + radius, intendedCenter.y + radius, intendedCenter.z + radius
         );
-
         Iterable<VoxelShape> shapes = world.getBlockCollisions(null, searchBox);
         Vec3d currentCenter = intendedCenter;
         Vec3d accumulatedNormal = Vec3d.ZERO;
         boolean collided = false;
 
-        // 2. Narrowphase: Exact Sphere-vs-AABB Math
         for (VoxelShape shape : shapes) {
             for (Box box : shape.getBoundingBoxes()) {
-                // Find the closest point P on the AABB to the sphere center C
                 double closestX = Math.max(box.minX, Math.min(currentCenter.x, box.maxX));
                 double closestY = Math.max(box.minY, Math.min(currentCenter.y, box.maxY));
                 double closestZ = Math.max(box.minZ, Math.min(currentCenter.z, box.maxZ));
 
-                // Calculate distance vector from closest point on box to sphere center
                 double dx = currentCenter.x - closestX;
                 double dy = currentCenter.y - closestY;
                 double dz = currentCenter.z - closestZ;
                 double distanceSq = dx * dx + dy * dy + dz * dz;
 
-                // If distance is less than radius squared, the sphere is penetrating the box
-                if (distanceSq < radius * radius) {
+                boolean centerInsideX = currentCenter.x >= box.minX && currentCenter.x <= box.maxX;
+                boolean centerInsideZ = currentCenter.z >= box.minZ && currentCenter.z <= box.maxZ;
+
+                // Only check edge support if the face lies on an OUTER block boundary (not an internal hole rim)
+                boolean hasEdgeSupport = false;
+                if (!centerInsideX || !centerInsideZ) {
+                    if (!centerInsideX) {
+                        boolean isWestOuterBoundary = Math.abs(box.minX - Math.floor(box.minX)) < 0.001;
+                        boolean isEastOuterBoundary = Math.abs(box.maxX - Math.ceil(box.maxX)) < 0.001;
+
+                        if (currentCenter.x < box.minX && isWestOuterBoundary) {
+                            BlockPos westNeighbor = BlockPos.ofFloored(box.minX - 0.5, box.maxY - 0.05, closestZ);
+                            hasEdgeSupport |= hasSurfaceSupportAt(world, westNeighbor, box.maxY);
+                        } else if (currentCenter.x > box.maxX && isEastOuterBoundary) {
+                            BlockPos eastNeighbor = BlockPos.ofFloored(box.maxX + 0.5, box.maxY - 0.05, closestZ);
+                            hasEdgeSupport |= hasSurfaceSupportAt(world, eastNeighbor, box.maxY);
+                        }
+                    }
+                    if (!centerInsideZ) {
+                        boolean isNorthOuterBoundary = Math.abs(box.minZ - Math.floor(box.minZ)) < 0.001;
+                        boolean isSouthOuterBoundary = Math.abs(box.maxZ - Math.ceil(box.maxZ)) < 0.001;
+
+                        if (currentCenter.z < box.minZ && isNorthOuterBoundary) {
+                            BlockPos northNeighbor = BlockPos.ofFloored(closestX, box.maxY - 0.05, box.minZ - 0.5);
+                            hasEdgeSupport |= hasSurfaceSupportAt(world, northNeighbor, box.maxY);
+                        } else if (currentCenter.z > box.maxZ && isSouthOuterBoundary) {
+                            BlockPos southNeighbor = BlockPos.ofFloored(closestX, box.maxY - 0.05, box.maxZ + 0.5);
+                            hasEdgeSupport |= hasSurfaceSupportAt(world, southNeighbor, box.maxY);
+                        }
+                    }
+                }
+
+                boolean isTopSurfaceContact = (currentCenter.y >= box.maxY - 0.05)
+                        && (currentCenter.y - radius <= box.maxY + 0.01)
+                        && (previousCenter.y + radius >= box.maxY - 0.05)
+                        && ((centerInsideX && centerInsideZ) || hasEdgeSupport);
+
+                if (distanceSq < radius * radius || isTopSurfaceContact) {
                     collided = true;
                     Vec3d pushNormal;
                     double penetrationDepth;
 
-                    if (distanceSq > 0.00001) {
+                    if (isTopSurfaceContact) {
+                        pushNormal = new Vec3d(0, 1, 0);
+                        penetrationDepth = Math.max(0.0, radius - (currentCenter.y - box.maxY));
+                    } else if (distanceSq > 0.00001) {
                         double distance = Math.sqrt(distanceSq);
                         pushNormal = new Vec3d(dx / distance, dy / distance, dz / distance);
                         penetrationDepth = radius - distance;
                     } else {
-                        // Sphere center inside box: calculate push normal opposed to movement vector
-                        double minX = currentCenter.x - box.minX;
-                        double maxX = box.maxX - currentCenter.x;
-                        double minY = currentCenter.y - box.minY;
-                        double maxY = box.maxY - currentCenter.y;
-                        double minZ = currentCenter.z - box.minZ;
-                        double maxZ = box.maxZ - currentCenter.z;
-
-                        Vec3d moveDir = intendedCenter.subtract(previousCenter);
-                        double absX = Math.abs(moveDir.x);
-                        double absY = Math.abs(moveDir.y);
-                        double absZ = Math.abs(moveDir.z);
-
-                        if (absX >= absY && absX >= absZ && absX > 1e-6) {
-                            if (moveDir.x > 0) {
-                                pushNormal = new Vec3d(-1, 0, 0);
-                                penetrationDepth = radius + minX;
-                            } else {
-                                pushNormal = new Vec3d(1, 0, 0);
-                                penetrationDepth = radius + maxX;
-                            }
-                        } else if (absY >= absX && absY >= absZ && absY > 1e-6) {
-                            if (moveDir.y > 0) {
-                                pushNormal = new Vec3d(0, -1, 0);
-                                penetrationDepth = radius + minY;
-                            } else {
-                                pushNormal = new Vec3d(0, 1, 0);
-                                penetrationDepth = radius + maxY;
-                            }
-                        } else if (absZ > 1e-6) {
-                            if (moveDir.z > 0) {
-                                pushNormal = new Vec3d(0, 0, -1);
-                                penetrationDepth = radius + minZ;
-                            } else {
-                                pushNormal = new Vec3d(0, 0, 1);
-                                penetrationDepth = radius + maxZ;
-                            }
-                        } else {
-                            pushNormal = new Vec3d(0, 1, 0);
-                            penetrationDepth = radius + maxY;
-                        }
+                        pushNormal = new Vec3d(0, 1, 0);
+                        penetrationDepth = radius + (box.maxY - currentCenter.y);
                     }
 
                     accumulatedNormal = accumulatedNormal.add(pushNormal);
@@ -302,6 +310,21 @@ public class GolfPhysicsEngine {
             }
         }
         return new SphereCollision(currentCenter, collided ? accumulatedNormal.normalize() : Vec3d.ZERO, collided);
+    }
+
+    /**
+     * Helper: checks if a neighbor block position has a collision surface matching target Y height.
+     */
+    private static boolean hasSurfaceSupportAt(World world, BlockPos pos, double targetMaxY) {
+        VoxelShape shape = world.getBlockState(pos).getCollisionShape(world, pos);
+        if (shape.isEmpty()) return false;
+        for (Box b : shape.getBoundingBoxes()) {
+            double worldMaxY = pos.getY() + b.maxY;
+            if (Math.abs(worldMaxY - targetMaxY) < 0.05) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -322,14 +345,17 @@ public class GolfPhysicsEngine {
     public static double getSurfaceFriction(World world, BlockPos pos) {
         BlockState state = world.getBlockState(pos);
 
-        if (state.isIn(BlockTags.SAND)) return 0.30;       // Bunkers kill horizontal momentum
-        if (state.isIn(BlockTags.LEAVES)) return 0.20;   // More likely to get stuck on trees
-        if (state.isOf(Blocks.GREEN_CARPET)) return 0.95;  // Smooth greens allow long slides
-        if (state.isOf(Blocks.SLIME_BLOCK)) return 0.10;   // Slime sticks and absorbs slide energy
+        if (state.isIn(BlockTags.SAND)) return 0.62;       // Bunkers kill horizontal momentum
+        if (state.isIn(BlockTags.LEAVES)) return 0.50;   // More likely to get stuck on trees
+        if (state.isOf(Blocks.SLIME_BLOCK)) return 0.30;   // Slime sticks and absorbs slide energy
+        if (state.isOf(Blocks.GREEN_CARPET) || state.isOf(Blocks.LIME_CARPET)
+                || state.isOf(Blocks.MOSS_CARPET) || state.isOf(Blocks.MOSS_BLOCK)) {
+            return 0.955; // Long, smooth green roll
+        }
 
         // Map native MC slipperiness (0.60 default -> 0.92 rolling friction)
         double mcSlipperiness = state.getBlock().getSlipperiness();
-        return 0.80 + (mcSlipperiness * 0.20);
+        return 0.80 + (mcSlipperiness * 0.19);
     }
 
     /**

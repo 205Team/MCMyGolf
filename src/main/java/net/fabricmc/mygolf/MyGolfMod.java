@@ -5,6 +5,7 @@ import net.fabricmc.mygolf.events.GolfBallEntityEvents;
 import net.fabricmc.mygolf.events.client.ItemGroupClassifyingEvents;
 import net.fabricmc.mygolf.events.client.MyClientTickEvents;
 import net.fabricmc.mygolf.global.CommonStr;
+import net.fabricmc.mygolf.global.ModConfig;
 import net.fabricmc.mygolf.registry.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -17,6 +18,9 @@ public class MyGolfMod implements ModInitializer {
 
         @Override
         public void onInitialize() {
+                //Read configs
+                ModConfig.load();
+
                 //注册方块
                 RegisterBlocks.registryBlocks();
                 //注册方块实体

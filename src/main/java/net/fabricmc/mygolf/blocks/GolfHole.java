@@ -9,11 +9,13 @@ import net.minecraft.block.piston.PistonBehavior;
 import net.minecraft.entity.ai.pathing.NavigationType;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.Item;
+import net.minecraft.item.ItemStack;
 import net.minecraft.screen.NamedScreenHandlerFactory;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.ActionResult;
 import net.minecraft.util.Hand;
 import net.minecraft.util.ItemScatterer;
+import net.minecraft.util.collection.DefaultedList;
 import net.minecraft.util.function.BooleanBiFunction;
 import net.minecraft.util.hit.BlockHitResult;
 import net.minecraft.util.math.BlockPos;
@@ -41,10 +43,10 @@ public class GolfHole extends BaseBlock {
                 AbstractBlock.Settings.copy(Blocks.GRASS_BLOCK)
                         .strength(1.5F, 6.0F)
                         .pistonBehavior(PistonBehavior.DESTROY)
+                        .nonOpaque()
         );
     }
 
-    //默认设置
     private static AbstractBlock.Settings defaultSetting() {
         return AbstractBlock.Settings.create(); //of(Material.SOLID_ORGANIC, MapColor.RED).ticksRandomly().strength(0.6F).sounds(BlockSoundGroup.GRASS);
     }
@@ -68,7 +70,6 @@ public class GolfHole extends BaseBlock {
         return HOLE_SHAPE;
     }
 
-    //生物不可寻路通过
     @Override
     public boolean canPathfindThrough(BlockState state, BlockView world, BlockPos pos, NavigationType type) {
         return false;
@@ -95,7 +96,6 @@ public class GolfHole extends BaseBlock {
         }
     }
 
-    //存储
     @Override
     public ActionResult onUse(BlockState state, World world, BlockPos pos, PlayerEntity player, Hand hand, BlockHitResult blockHitResult) {
         if (!world.isClient) {
@@ -114,6 +114,18 @@ public class GolfHole extends BaseBlock {
         return ActionResult.PASS;
     }
 
+    @Override
+    public float getAmbientOcclusionLightLevel(BlockState state, BlockView world, BlockPos pos) {
+        return 0.2F; // Enables AO shadows on faces and inside the cutout
+    }
+    @Override
+    public boolean hasSidedTransparency(BlockState state) {
+        return false; // Prevents neighbors from skipping AO projection onto this block
+    }
+    @Override
+    public int getOpacity(BlockState state, BlockView world, BlockPos pos) {
+        return 0; // Prevents sunlight from passing straight through the block
+    }
 }
 
 
