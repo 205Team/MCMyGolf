@@ -2,8 +2,6 @@ package net.fabricmc.mygolf;
 
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.mygolf.events.GolfBallEntityEvents;
-import net.fabricmc.mygolf.events.client.ItemGroupClassifyingEvents;
-import net.fabricmc.mygolf.events.client.MyClientTickEvents;
 import net.fabricmc.mygolf.global.CommonStr;
 import net.fabricmc.mygolf.global.ModConfig;
 import net.fabricmc.mygolf.registry.*;
@@ -31,14 +29,10 @@ public class MyGolfMod implements ModInitializer {
                 RegisterEntities.registryEntities();
                 //注册声音
                 RegisterSounds.registrySounds();
-
-                //注册事件
                 //注册高尔夫球实体事件
                 GolfBallEntityEvents.registerEvents();
-                //注册tick事件
-                MyClientTickEvents.registerEvents();
-                //注册物品类事件
-                ItemGroupClassifyingEvents.registerEvents();
+                //注册接收器
+                RegisterReceivers.register();
 
                 LOGGER.info("Hello Fabric world!");
         }

@@ -54,6 +54,5 @@ public class RegisterBlocks {
      */
     private static void registryBlock(Block block, String codeName, Item.Settings settings) {
         Registry.register(Registries.BLOCK, new Identifier(CommonStr.modId, codeName), block);
-        Registry.register(Registries.ITEM, new Identifier(CommonStr.modId, codeName), new BlockItem(block, settings));
     }
 }

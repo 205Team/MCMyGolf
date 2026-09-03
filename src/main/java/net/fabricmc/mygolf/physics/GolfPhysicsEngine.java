@@ -54,12 +54,13 @@ public class GolfPhysicsEngine {
         // 1. Determine ground support status before velocity calculations
         boolean hasGround = hasGroundSupport(world, pos, config.radius());
         if (onGround) {
-            if (vel.y > 0.01 || !hasGround) {
+            if (vel.y > 0.01 || vel.y < -0.025 || !hasGround) {
                 onGround = false;
+                spin = spin.multiply(0.3D);
             }
         } else {
             // Promote freshly spawned or landing entities to ground state if supported
-            if (hasGround && Math.abs(vel.y) < 0.08) {
+            if (hasGround && Math.abs(vel.y) < 0.025) {
                 onGround = true;
             }
         }
@@ -67,7 +68,7 @@ public class GolfPhysicsEngine {
         // 2. Calculate new tick velocity
         Vec3d newVel;
         if (onGround) {
-            BlockPos groundPos = BlockPos.ofFloored(pos.x, pos.y - config.radius() - 0.05, pos.z);
+            BlockPos groundPos = BlockPos.ofFloored(pos.x, pos.y - config.radius() - 0.01, pos.z);
             double groundFriction = getSurfaceFriction(world, groundPos);
 
             // Decelerate horizontal sliding velocity using ground friction
@@ -75,9 +76,11 @@ public class GolfPhysicsEngine {
 
             // Convert linear ground velocity into angular velocity vector (spinVector)
             double radius = config.radius();
-            spin = new Vec3d(newVel.z / radius, 0, -newVel.x / radius);
+            Vec3d targetSpin = new Vec3d(newVel.z / radius, 0, -newVel.x / radius);
+            double gripFactor = 0.35D;
+            spin = spin.add(targetSpin.subtract(spin).multiply(gripFactor));
 
-            if (newVel.lengthSquared() < 0.0001) {
+            if (newVel.lengthSquared() < 1e-6) {
                 // Check hole entry when stationary
                 if (isRealTick) {
                     checkHoleEntry(world, ball);
@@ -99,9 +102,21 @@ public class GolfPhysicsEngine {
                 newVel = vel.multiply(fluidDrag).add(0, netGravity, 0);
             } else {
                 // Air Physics: Standard drag + Gravity + Magnus force
-                Vec3d magnusForce = GolfBallEntity.ENABLE_MAGNUS_EFFECT
-                        ? spin.crossProduct(vel).multiply(config.liftCoefficient())
-                        : Vec3d.ZERO;
+                spin = spin.multiply(0.98D);
+                double maxAirSpin = 1.5D; // Maximum rad/tick
+                if (spin.lengthSquared() > maxAirSpin * maxAirSpin) {
+                    spin = spin.normalize().multiply(maxAirSpin);
+                }
+                Vec3d magnusForce = Vec3d.ZERO;
+                if (GolfBallEntity.ENABLE_MAGNUS_EFFECT && vel.lengthSquared() > 1e-6) {
+                    magnusForce = spin.crossProduct(vel.normalize()).multiply(config.liftCoefficient() * 0.3D);
+
+                    // Limit positive +Y lift force to max 80% of gravity so the ball always descends
+                    double maxUpwardLift = config.gravity() * 0.8D;
+                    if (magnusForce.y > maxUpwardLift) {
+                        magnusForce = new Vec3d(magnusForce.x, maxUpwardLift, magnusForce.z);
+                    }
+                }
                 newVel = vel.multiply(config.dragCoefficient()).add(0, -config.gravity(), 0).add(magnusForce);
             }
         }
@@ -112,7 +127,7 @@ public class GolfPhysicsEngine {
         int substeps = Math.max(1, (int) Math.ceil(velocityMagnitude / maxStep));
         substeps = Math.min(substeps, 20);
 
-        Vec3d stepVel = newVel.multiply(1.0 / substeps);
+        double invSubsteps = 1.0 / substeps;
         Vec3d currentCenter = pos;
         Vec3d currentVel = newVel;
         Vec3d currentSpin = spin;
@@ -120,6 +135,7 @@ public class GolfPhysicsEngine {
 
         // 4. Ray/Sphere sweep movement tick by tick
         for (int i = 0; i < substeps; i++) {
+            Vec3d stepVel = currentVel.multiply(invSubsteps);
             Vec3d nextCenter = currentCenter.add(stepVel);
             SphereCollision collision = resolveSphereCollision(world, nextCenter, currentCenter, config.radius());
 
@@ -138,37 +154,48 @@ public class GolfPhysicsEngine {
 
                 // Apply restitution to normal velocity (bounce)
                 Vec3d reflectedNormal = normalVel.multiply(-surfaceBounciness);
-                // Apply friction to tangent velocity (skid reduction)
-                double normalImpulse = -(1.0 + surfaceBounciness) * normalDot;
-                double maxFrictionImpulse = surfaceFriction * normalImpulse;
-                double tangentSpeed = tangentVel.length();
 
+                // Apply friction to tangent velocity (skid reduction)
+                double rollingRetention = getSurfaceFriction(world, impactBlockPos);
+                double dynamicFrictionCoeff = (1.0 - rollingRetention) * 1.5;
+                double normalImpulse = -(1.0 + surfaceBounciness) * normalDot;
+                double maxFrictionImpulse = dynamicFrictionCoeff * normalImpulse;
+                double tangentSpeed = tangentVel.length();
                 Vec3d reflectedTangent = tangentVel;
                 if (tangentSpeed > 0.0001 && normalDot < 0 && !currentlyOnGround) {
-                    double frictionFactor = Math.max(0.65, 1.0 - (maxFrictionImpulse / tangentSpeed));
+                    double frictionFactor = Math.max(0.0, 1.0 - (maxFrictionImpulse / tangentSpeed));
                     reflectedTangent = tangentVel.multiply(frictionFactor);
                 }
 
                 // Combine normal and tangent responses to form total bounce direction
                 Vec3d reflectedVel = reflectedNormal.add(reflectedTangent);
-
                 Vec3d adjustedPos = collision.resolvedPos();
 
                 // Determine if landing hit converts airborne state to ground rolling state
                 hasGround = hasGroundSupport(world, adjustedPos, config.radius());
                 double verticalImpactSpeed = Math.abs(normalVel.y);
-                boolean lowVelocityImpact = verticalImpactSpeed < 0.08;
+                boolean lowVelocityImpact = verticalImpactSpeed < 0.025;
                 boolean landsOnGround = normal.y > 0.7 && hasGround && lowVelocityImpact;
 
                 if (landsOnGround) {
                     // Ball is moving slowly enough vertically to settle into a ground roll
                     currentlyOnGround = true;
+                    reflectedVel = new Vec3d(reflectedVel.x, 0.0, reflectedVel.z);
                     if (!onGround) {
-                        reflectedVel = new Vec3d(reflectedVel.x * surfaceFriction, 0, reflectedVel.z * surfaceFriction);
+                        Vec3d targetSpin = new Vec3d(reflectedVel.z / config.radius(), 0, -reflectedVel.x / config.radius());
+                        currentSpin = currentSpin.add(targetSpin.subtract(currentSpin).multiply(0.35D));
                     }
                 } else {
                     // Preserve calculated vertical bounce from normalVel * -surfaceBounciness
                     currentlyOnGround = false;
+
+                    // Convert tangential sliding friction into rotational torque
+                    double spinRestitution = 0.35D;
+                    currentSpin = currentSpin.multiply(spinRestitution * (1.0D - surfaceFriction * 0.5D));
+                    if (tangentSpeed > 0.001) {
+                        Vec3d impactTorque = normal.crossProduct(tangentVel).multiply(surfaceFriction / config.radius());
+                        currentSpin = currentSpin.add(impactTorque.multiply(0.25D));
+                    }
                 }
 
                 // Trigger collision events
@@ -181,26 +208,26 @@ public class GolfPhysicsEngine {
                 // Update intermediate variables for next substep iteration
                 currentCenter = adjustedPos;
                 currentVel = reflectedVel;
-                currentSpin = currentSpin.multiply(0.98);
 
                 // Stop remaining substeps if ball came to a halt
-                if (currentlyOnGround && currentVel.lengthSquared() < 0.0001) {
+                if (currentlyOnGround && currentVel.lengthSquared() < 1e-6) {
                     currentVel = Vec3d.ZERO;
                     break;
                 }
-                stepVel = currentVel.multiply(1.0 / substeps);
             } else {
                 // Free movement: No hit detected, move forward
                 currentCenter = nextCenter;
                 // Check if ball rolled off edge during mid-step
                 if (currentlyOnGround && !hasGroundSupport(world, currentCenter, config.radius())) {
                     currentlyOnGround = false;
+                    currentSpin = currentSpin.multiply(0.3);
                 }
             }
         }
 
         // 5. Post-step ground re-check
-        currentlyOnGround = hasGroundSupport(world, currentCenter, config.radius());
+        boolean supported = hasGroundSupport(world, currentCenter, config.radius());
+        currentlyOnGround = supported && Math.abs(currentVel.y) < 0.025;
 
         // Return new state with updated position, velocity, decay spin, and ground boolean
         return new State(
@@ -214,11 +241,11 @@ public class GolfPhysicsEngine {
     /**
      * Checks if there are any solid collision shapes supporting the bottom of the ball.
      */
-    private static boolean hasGroundSupport(World world, Vec3d centerPos, double radius) {
-        double probeWidth = 0.02;
+    public static boolean hasGroundSupport(World world, Vec3d centerPos, double radius) {
+        double probeWidth = 0.01;
 
         Box groundCheckArea = new Box(
-                centerPos.x - probeWidth, centerPos.y - radius - 0.05, centerPos.z - probeWidth,
+                centerPos.x - probeWidth, centerPos.y - radius - 0.01, centerPos.z - probeWidth,
                 centerPos.x + probeWidth, centerPos.y - radius + 0.01, centerPos.z + probeWidth
         );
 
@@ -282,7 +309,7 @@ public class GolfPhysicsEngine {
                     }
                 }
 
-                boolean isTopSurfaceContact = (currentCenter.y >= box.maxY - 0.05)
+                boolean isTopSurfaceContact = (currentCenter.y >= box.maxY - 0.025)
                         && (currentCenter.y - radius <= box.maxY + 0.01)
                         && (previousCenter.y + radius >= box.maxY - 0.05)
                         && ((centerInsideX && centerInsideZ) || hasEdgeSupport);
@@ -306,10 +333,22 @@ public class GolfPhysicsEngine {
 
                     accumulatedNormal = accumulatedNormal.add(pushNormal);
                     currentCenter = currentCenter.add(pushNormal.multiply(penetrationDepth));
+
+                    System.out.printf("[COLLISION DEBUG] Box X:[%.2f..%.2f] Y_max:%.2f | Center: [%.4f, %.4f] | centerInsideX: %b | edgeSupp: %b | topContact: %b | PushNorm: %s | Pen: %.4f%n",
+                            box.minX, box.maxX, box.maxY,
+                            currentCenter.x, currentCenter.y,
+                            centerInsideX, hasEdgeSupport, isTopSurfaceContact,
+                            pushNormal, penetrationDepth);
                 }
             }
         }
-        return new SphereCollision(currentCenter, collided ? accumulatedNormal.normalize() : Vec3d.ZERO, collided);
+        Vec3d finalNormal = Vec3d.ZERO;
+        if (collided) {
+            double lenSq = accumulatedNormal.lengthSquared();
+            finalNormal = lenSq > 1e-6 ? accumulatedNormal.normalize() : new Vec3d(0, 1, 0);
+        }
+
+        return new SphereCollision(currentCenter, finalNormal, collided);
     }
 
     /**
@@ -436,7 +475,7 @@ public class GolfPhysicsEngine {
             points.add(current.pos().subtract(0, config.radius(), 0));
 
             // Stop predicting if the ball lands and stops moving
-            if (current.onGround() && current.vel().lengthSquared() < 0.0001) {
+            if (current.onGround() && current.vel().lengthSquared() < 1e-6) {
                 break;
             }
         }
@@ -479,5 +518,13 @@ public class GolfPhysicsEngine {
         }
 
         return resampled;
+    }
+
+    /**
+     * Queries block geometry to detect bounding box overlap.
+     */
+    public static boolean isClipping(World world, GolfBallEntity entity, Box box) {
+        Box contractedBox = box.contract(0.04);
+        return world.getBlockCollisions(entity, contractedBox).iterator().hasNext();
     }
 }

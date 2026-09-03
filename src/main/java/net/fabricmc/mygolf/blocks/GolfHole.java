@@ -2,9 +2,12 @@ package net.fabricmc.mygolf.blocks;
 
 import net.fabricmc.mygolf.blockEntity.GolfHoleEntity;
 import net.fabricmc.mygolf.blocks.base.BaseBlock;
+import net.fabricmc.mygolf.registry.RegisterBlockEntities;
 import net.fabricmc.mygolf.registry.RegisterBlocks;
 import net.minecraft.block.*;
 import net.minecraft.block.entity.BlockEntity;
+import net.minecraft.block.entity.BlockEntityTicker;
+import net.minecraft.block.entity.BlockEntityType;
 import net.minecraft.block.piston.PistonBehavior;
 import net.minecraft.entity.ai.pathing.NavigationType;
 import net.minecraft.entity.player.PlayerEntity;
@@ -19,12 +22,13 @@ import net.minecraft.util.collection.DefaultedList;
 import net.minecraft.util.function.BooleanBiFunction;
 import net.minecraft.util.hit.BlockHitResult;
 import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Direction;
 import net.minecraft.util.shape.VoxelShape;
 import net.minecraft.util.shape.VoxelShapes;
 import net.minecraft.world.BlockView;
 import net.minecraft.world.World;
 
-public class GolfHole extends BaseBlock {
+public class GolfHole extends BaseBlock implements BlockEntityProvider {
 
     protected static final VoxelShape HOLE_SHAPE;
     private static final VoxelShape CUTOUT_SHAPE;
@@ -36,6 +40,11 @@ public class GolfHole extends BaseBlock {
 
     public GolfHole(AbstractBlock.Settings settings) {
         super(settings);
+    }
+
+    @Override
+    public BlockEntity createBlockEntity(BlockPos pos, BlockState state) {
+        return new GolfHoleEntity(pos, state);
     }
 
     public static GolfHole defaultInstance() {
@@ -99,19 +108,12 @@ public class GolfHole extends BaseBlock {
     @Override
     public ActionResult onUse(BlockState state, World world, BlockPos pos, PlayerEntity player, Hand hand, BlockHitResult blockHitResult) {
         if (!world.isClient) {
-            //This will call the createScreenHandlerFactory method from BlockWithEntity, which will return our blockEntity cast to
-            //a namedScreenHandlerFactory. If your block class does not extend BlockWithEntity, it needs to implement createScreenHandlerFactory.
-            BlockState upBlockState = world.getBlockState(pos.up());
-            if (upBlockState.isOf(RegisterBlocks.FLAGSTICK_BLOCK)) {
-                NamedScreenHandlerFactory screenHandlerFactory = upBlockState.createScreenHandlerFactory(world, pos);
-
-                if (screenHandlerFactory != null) {
-                    //With this call the server will request the client to open the appropriate screen handler
-                    player.openHandledScreen(screenHandlerFactory);
-                }
+            BlockEntity be = world.getBlockEntity(pos);
+            if (be instanceof NamedScreenHandlerFactory factory) {
+                player.openHandledScreen(factory);
             }
         }
-        return ActionResult.PASS;
+        return ActionResult.SUCCESS;
     }
 
     @Override
@@ -125,6 +127,19 @@ public class GolfHole extends BaseBlock {
     @Override
     public int getOpacity(BlockState state, BlockView world, BlockPos pos) {
         return 0; // Prevents sunlight from passing straight through the block
+    }
+
+    @Override
+    public boolean hasComparatorOutput(BlockState state) {
+        return true;
+    }
+
+    @Override
+    public int getComparatorOutput(BlockState state, World world, BlockPos pos) {
+        if (world.getBlockEntity(pos) instanceof GolfHoleEntity holeEntity) {
+            return holeEntity.getLastHitCount();
+        }
+        return 0;
     }
 }
 

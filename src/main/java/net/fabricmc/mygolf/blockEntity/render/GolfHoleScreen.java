@@ -1,17 +1,20 @@
 package net.fabricmc.mygolf.blockEntity.render;
 
+import net.fabricmc.mygolf.global.CommonStr;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.ingame.HandledScreen;
 import net.minecraft.entity.player.PlayerInventory;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
 
-public class FlagstickScreen extends HandledScreen<FlagstickScreenHandler> {
+public class GolfHoleScreen extends HandledScreen<GolfHoleScreenHandler> {
     //A path to the gui texture. In this example we use the texture from the dispenser
-    private static final Identifier TEXTURE = new Identifier("minecraft", "textures/gui/container/dispenser.png");
+    private static final Identifier TEXTURE = new Identifier(CommonStr.modId, "textures/gui/golf_hole.png");
 
-    public FlagstickScreen(FlagstickScreenHandler handler, PlayerInventory inventory, Text title) {
+    public GolfHoleScreen(GolfHoleScreenHandler handler, PlayerInventory inventory, Text title) {
         super(handler, inventory, title);
+        this.backgroundHeight = 133;
+        this.playerInventoryTitleY = this.backgroundHeight - 94;
     }
 
     @Override

@@ -7,6 +7,9 @@ import net.fabricmc.mygolf.registry.RegisterItems;
 import net.fabricmc.mygolf.tools.DebugUtil;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.Blocks;
+import net.minecraft.block.HopperBlock;
+import net.minecraft.block.entity.BlockEntity;
+import net.minecraft.block.entity.HopperBlockEntity;
 import net.minecraft.block.entity.PistonBlockEntity;
 import net.minecraft.entity.*;
 import net.minecraft.entity.damage.DamageSource;
@@ -15,26 +18,36 @@ import net.minecraft.entity.data.DataTracker;
 import net.minecraft.entity.data.TrackedData;
 import net.minecraft.entity.data.TrackedDataHandlerRegistry;
 import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.entity.vehicle.AbstractMinecartEntity;
+import net.minecraft.entity.vehicle.BoatEntity;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
 import net.minecraft.nbt.NbtCompound;
+import net.minecraft.network.listener.ClientPlayPacketListener;
+import net.minecraft.network.packet.Packet;
+import net.minecraft.network.packet.s2c.play.EntitySpawnS2CPacket;
 import net.minecraft.particle.DustParticleEffect;
 import net.minecraft.particle.ParticleTypes;
 import net.minecraft.registry.tag.DamageTypeTags;
+import net.minecraft.server.world.ChunkTicketType;
 import net.minecraft.server.world.ServerWorld;
+import net.minecraft.sound.SoundCategory;
 import net.minecraft.sound.SoundEvents;
-import net.minecraft.text.Text;
 import net.minecraft.util.ActionResult;
-import net.minecraft.util.Formatting;
 import net.minecraft.util.Hand;
 import net.minecraft.util.hit.BlockHitResult;
 import net.minecraft.util.hit.HitResult;
 import net.minecraft.util.math.*;
 import net.minecraft.world.RaycastContext;
 import net.minecraft.world.World;
+import org.jetbrains.annotations.Nullable;
 import org.joml.Quaternionf;
+import org.joml.Vector3d;
 import org.joml.Vector3f;
 import java.util.Comparator;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
 
 public class GolfBallEntity extends Entity {
 
@@ -54,6 +67,8 @@ public class GolfBallEntity extends Entity {
     private static final TrackedData<Integer> COLOR = DataTracker.registerData(GolfBallEntity.class, TrackedDataHandlerRegistry.INTEGER);
     private static final TrackedData<Integer> JUMP_TICKS = DataTracker.registerData(GolfBallEntity.class, TrackedDataHandlerRegistry.INTEGER);    // DataTracker keys to sync hit response across the network
     private static final TrackedData<Float> HOP_HEIGHT = DataTracker.registerData(GolfBallEntity.class, TrackedDataHandlerRegistry.FLOAT);
+    private static final TrackedData<Optional<UUID>> OWNER_UUID = DataTracker.registerData(GolfBallEntity.class, TrackedDataHandlerRegistry.OPTIONAL_UUID);
+    private static final TrackedData<Boolean> IS_SLEEPING = DataTracker.registerData(GolfBallEntity.class, TrackedDataHandlerRegistry.BOOLEAN);
     // Base radiuses in blocks
     public static final double MIN_RADIUS = 3.0D;   // Close range (Name tag / direct focus)
     public static final double MID_RADIUS = 16.0D;   // Medium range (3D Arrow)
@@ -62,9 +77,15 @@ public class GolfBallEntity extends Entity {
     public static final double MIN_DISTANCE_SQ = MIN_RADIUS * MIN_RADIUS;
     public static final double MID_DISTANCE_SQ = MID_RADIUS * MID_RADIUS;
     public static final double MAX_DISTANCE_SQ = MAX_RADIUS * MAX_RADIUS;
+    private int mountCooldown = 0;  // Vehicle mounting wait time
+    private long startTime = 0L;    // First hit time
+    private int sleepCheckTimer = 0;    // For sleep state
+    private int stuckTicks = 0;
+    private Vec3d lastSafePos = Vec3d.ZERO;
 
     public GolfBallEntity(EntityType<? extends GolfBallEntity> entityType, World level) {
         super(entityType, level);
+        this.noClip = true;
     }
 
     // --- Getters & Setters  ---
@@ -77,8 +98,10 @@ public class GolfBallEntity extends Entity {
     public void incrementHitCount() {
         if (!this.isGoaled()){
             this.setHitCount(this.getHitCount() + 1);
+            if (this.getHitCount() == 0 && this.startTime == 0L) {
+                this.startTime = this.getWorld().getTime();
+            }
         }
-
     }
 
     public Vec3d getSpin() {
@@ -86,7 +109,11 @@ public class GolfBallEntity extends Entity {
         return new Vec3d(vec.x(), vec.y(), vec.z());
     }
     public void setSpin(Vec3d spin) {
-        this.dataTracker.set(SPIN_VECTOR, new Vector3f((float) spin.x, (float) spin.y, (float) spin.z));
+        Vec3d current = this.getSpin();
+        // Only issue a DataTracker network sync packet if the spin delta > 0.001
+        if (current.squaredDistanceTo(spin) > 0.000001D) {
+            this.dataTracker.set(SPIN_VECTOR, new Vector3f((float) spin.x, (float) spin.y, (float) spin.z));
+        }
     }
 
     public boolean isGoaled() {
@@ -109,14 +136,164 @@ public class GolfBallEntity extends Entity {
         this.dataTracker.set(COLOR, color);
     }
 
+    public Optional<UUID> getOwnerUuid() {return this.dataTracker.get(OWNER_UUID);}
+    public void setOwnerUuid(@Nullable UUID uuid) {this.dataTracker.set(OWNER_UUID, Optional.ofNullable(uuid));}
+    public boolean hasOwner() {return this.getOwnerUuid().isPresent();}
+    public boolean isOwner(PlayerEntity player) {return this.getOwnerUuid().map(uuid -> uuid.equals(player.getUuid())).orElse(true);}
+
+    public boolean isSleeping() {return this.dataTracker.get(IS_SLEEPING);}
+    public void setSleeping(boolean isSleeping) {this.dataTracker.set(IS_SLEEPING, isSleeping);}
+
+    public long getStartTime() {return this.startTime;}
+    public void setStartTime(long startTime) {this.startTime = startTime;}
+
     @Override
     public void tick() {
         super.tick();
 
-        // 1. Pack current entity state (Run on BOTH Client and Server for perfect sync)
+        // 1. Tick state timers
+        this.tickTimers();
+
+        // 2. Handle Vehicle States
+        if (this.handleVehicleState()) {
+            this.wakeUp();
+            return;
+        }
+
+        // 3. Sleeping State Bypass
+        if (this.isSleeping()) {
+            this.sleeper();
+            return;
+        }
+
+        // 4. Clipping Detection & Emergency Recovery
+        if (this.checkAndHandleClipping()) {
+            return;
+        }
+
+        // 5. Deterministic Physics Execution (Both Client and Server)
+        this.tickPhysicsEngine();
+
+        // 6. Side-Specific Post-Physics Logic
+        if (this.getWorld().isClient()) {
+            this.tickClientVisuals();
+        } else {
+            this.tickServerLogic();
+        }
+
+        //Debug
+        if(!this.getWorld().isClient())
+            DebugUtil.logOnChange("ball_" + this.getId() + "_isSleeping", this.isSleeping());
+    }
+
+    private void tickTimers() {
+        if (this.mountCooldown > 0) {
+            this.mountCooldown--;
+        }
+        if (this.getJumpTicks() > 0) {
+            this.setJumpTicks(this.getJumpTicks() - 1);
+        }
+        if (this.getJumpTicks() == 0 && this.getHopHeight() > 0.0F) {
+            this.setHopHeight(0.0F);
+        }
+    }
+
+    private boolean handleVehicleState() {
+        // Case A: Ball is currently mounted
+        if (this.hasVehicle()) {
+            this.setSpin(Vec3d.ZERO);
+
+            if (this.getWorld().isClient()) {
+                Entity vehicle = this.getVehicle();
+                this.prevWorldRotation.set(this.worldRotation);
+
+                float yawRad = (float) Math.toRadians(-vehicle.getYaw());
+                float pitchRad = (float) Math.toRadians(vehicle.getPitch());
+
+                this.worldRotation.identity()
+                        .rotateY(yawRad)
+                        .rotateX(pitchRad);
+            }
+            return true;
+        }
+
+        // Case B: Ball is unmounted – Scan for new vehicles (Server side only)
+        if (!this.getWorld().isClient() && this.mountCooldown == 0) {
+            List<Entity> vehicles = this.getWorld().getOtherEntities(
+                    this,
+                    this.getBoundingBox().expand(0.05),
+                    e -> (e instanceof BoatEntity boat && boat.getPassengerList().size() < 2) ||
+                            (e instanceof AbstractMinecartEntity cart && !cart.hasPassengers())
+            );
+
+            if (!vehicles.isEmpty()) {
+                this.startRiding(vehicles.get(0), true);
+                this.setSpin(Vec3d.ZERO);
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private void sleeper() {
+        if (this.getWorld().isClient()) {
+            // Keep previous rotation aligned while resting to prevent render snapping on wake-up
+            this.prevWorldRotation.set(this.worldRotation);
+        } else {
+            double radius = this.physicsConfig.radius();
+            Vec3d centerPos = this.getPos().add(0, radius, 0);
+
+            // Instant ground check every tick (prevents midair floating delay on block break)
+            if (!GolfPhysicsEngine.hasGroundSupport(this.getWorld(), centerPos, radius)) {
+                this.wakeUp();
+                return;
+            }
+
+            // Low-frequency check (every 5 ticks) instead of 20 sub-steps per tick
+            if (++this.sleepCheckTimer % 5 == 0) {
+                if (!this.getWorld().getFluidState(this.getBlockPos()).isEmpty()) {
+                    this.wakeUp();
+                    return;
+                }
+                this.tickServerLogic();
+            }
+        }
+    }
+
+    private boolean checkAndHandleClipping() {
+        if (this.getWorld().isClient()) return false;
+
+        if (GolfPhysicsEngine.isClipping(this.getWorld(), this, this.getBoundingBox())) {
+            this.stuckTicks++;
+            // 1. Grace Period (Ticks 1-2): Let physics try to bounce/push it out naturally
+            if (this.stuckTicks <= 2) {
+                return false;
+            }
+            // 2. Soft Reset (Tick 3): Snap once back to last known SAFE position
+            if (this.stuckTicks == 3 && !this.lastSafePos.equals(Vec3d.ZERO)) {
+                this.setVelocity(Vec3d.ZERO);
+                this.setPosition(this.lastSafePos.x, this.lastSafePos.y + 0.05, this.lastSafePos.z);
+                return true; // Skip this tick's physics step
+            }
+            // 3. Emergency Cleanup (Tick 10+): Unrecoverable clipping, drop item safely
+            if (this.stuckTicks > 10) {
+                this.dropItem(RegisterItems.GOLF_BALL);
+                this.discard();
+                return true;
+            }
+        } else {
+            // Ball is in valid open air: update safe position and clear counter
+            this.lastSafePos = this.getPos();
+            this.stuckTicks = 0;
+        }
+        return false;
+    }
+
+    private void tickPhysicsEngine() {
+        // Pack current entity state
         double radius = this.physicsConfig.radius();
         Vec3d centerPos = this.getPos().add(0, radius, 0);
-
         GolfPhysicsEngine.State currentState = new GolfPhysicsEngine.State(
                 centerPos,
                 this.getVelocity(),
@@ -124,7 +301,7 @@ public class GolfBallEntity extends Entity {
                 this.isOnGround()
         );
 
-        // 2. Run deterministic physics engine step
+        // Run deterministic physics engine step
         GolfPhysicsEngine.State newState = GolfPhysicsEngine.step(
                 this.getWorld(), this, currentState, this.physicsConfig, true
         );
@@ -132,127 +309,138 @@ public class GolfBallEntity extends Entity {
         // Offset reverse back to entity feet position
         Vec3d entityFeetPos = newState.pos().subtract(0, radius, 0);
 
-        // 3. Apply results back to Minecraft Entity
+        // Apply results back to Minecraft Entity
+        this.prevX = this.getX();
+        this.prevY = this.getY();
+        this.prevZ = this.getZ();
         this.setPosition(entityFeetPos);
         this.setVelocity(newState.vel());
         this.setSpin(newState.spin());
         this.setOnGround(newState.onGround());
+        this.velocityDirty = true;
+        this.velocityModified = true;
+
+        if (newState.onGround() && newState.vel().lengthSquared() < 1e-6 && newState.spin().lengthSquared() < 1e-4) {
+            this.setSleeping(true);
+        }
 
         // Triggers block interactions
         this.checkBlockCollision();
+    }
 
-        // 4. Jump animation handling
-        if (this.getJumpTicks() > 0) {
-            this.setJumpTicks(this.getJumpTicks() - 1);
+    private void tickClientVisuals() {
+        double radius = this.physicsConfig.radius();
+        Vec3d vel = this.getVelocity();
+        Vec3d activeSpin = this.getSpin();
+        this.prevWorldRotation.set(this.worldRotation);
+        double horizontalSpeed = Math.sqrt(vel.x * vel.x + vel.z * vel.z);
+
+        if (this.isOnGround() && horizontalSpeed > 0.005) {
+            float rollAngle = (float) (horizontalSpeed / radius);
+            float axisX = (float) (vel.z / horizontalSpeed);
+            float axisZ = (float) (-vel.x / horizontalSpeed);
+            Quaternionf deltaRotation = new Quaternionf().rotationAxis(rollAngle, axisX, 0.0f, axisZ);
+            deltaRotation.mul(this.worldRotation, this.worldRotation);
+        } else if (activeSpin.lengthSquared() > 0.0001) {
+            double spinSpeed = activeSpin.length();
+            Vec3d spinAxis = activeSpin.normalize();
+            Quaternionf deltaRotation = new Quaternionf().rotationAxis(
+                    (float) spinSpeed, (float) spinAxis.x, (float) spinAxis.y, (float) spinAxis.z
+            );
+            deltaRotation.mul(this.worldRotation, this.worldRotation);
         }
-        if (this.isOnGround() && this.getJumpTicks() == 0) {
-            this.setHopHeight(0.0F);
+
+        // Handle trail
+        spawnTrailParticles();
+
+        // Debug
+        if(this.age % 1 == 0) {
+            Vec3d centerPos = this.getPos().add(0, radius, 0);
+            System.out.printf("[Tick %d] Vel: [X: %.4f, Y: %.4f, Z: %.4f] | centerPos [X: %.4f, Y: %.4f, Z: %.4f] | Rot [X: %.4f, Y: %.4f, Z: %.4f, W: %.4f]%n",
+                    this.age, vel.x, vel.y, vel.z, centerPos.x, centerPos.y, centerPos.z, this.worldRotation.x, this.worldRotation.y, this.worldRotation.z, this.worldRotation.w);
+        }
+        DebugUtil.logOnChange("ball_" + this.getId() + "_is_on_ground", this.isOnGround());
+    }
+
+    private void tickServerLogic() {
+        double radius = this.physicsConfig.radius();
+        BlockPos ballCenterPos = BlockPos.ofFloored(this.getPos().add(0, radius, 0));
+        BlockState stateAtBall = this.getWorld().getBlockState(ballCenterPos);
+
+        BlockPos hopperPos = ballCenterPos;
+        BlockEntity blockEntity = this.getWorld().getBlockEntity(hopperPos);
+
+        if (!(blockEntity instanceof HopperBlockEntity)) {
+            hopperPos = this.getBlockPos().down();
+            blockEntity = this.getWorld().getBlockEntity(hopperPos);
         }
 
-        // 5. Split side-specific logic (Visuals vs Server Management)
-        if (this.getWorld().isClient()) {
-            /**
-             * Client-side Visuals
-             */
-            Vec3d vel = this.getVelocity();
-            Vec3d activeSpin = this.getSpin();
-            this.prevWorldRotation.set(this.worldRotation);
-            double horizontalSpeed = Math.sqrt(vel.x * vel.x + vel.z * vel.z);
-
-            if (this.isOnGround() && horizontalSpeed > 0.005) {
-                float rollAngle = (float) (horizontalSpeed / radius);
-                float axisX = (float) (vel.z / horizontalSpeed);
-                float axisZ = (float) (-vel.x / horizontalSpeed);
-                Quaternionf deltaRotation = new Quaternionf().rotationAxis(rollAngle, axisX, 0.0f, axisZ);
-                deltaRotation.mul(this.worldRotation, this.worldRotation);
-            } else if (activeSpin.lengthSquared() > 0.0001) {
-                double spinSpeed = activeSpin.length();
-                Vec3d spinAxis = activeSpin.normalize();
-                Quaternionf deltaRotation = new Quaternionf().rotationAxis(
-                        (float) spinSpeed, (float) spinAxis.x, (float) spinAxis.y, (float) spinAxis.z
+        if (blockEntity instanceof HopperBlockEntity hopper) {
+            // Check if hopper is currently locked via Redstone
+            if (!this.getWorld().getBlockState(hopperPos).get(HopperBlock.ENABLED)) {
+                // Hopper is locked, skip collection
+            } else if (this.tryInsertIntoHopper(hopper)) {
+                // Play hopper suction sound
+                this.getWorld().playSound(
+                        null,
+                        this.getX(), this.getY(), this.getZ(),
+                        SoundEvents.ENTITY_ITEM_PICKUP,
+                        SoundCategory.BLOCKS,
+                        0.5F, 1.5F
                 );
-                deltaRotation.mul(this.worldRotation, this.worldRotation);
+                this.discard();
+                return;
             }
+        }
 
-            // Handle trail
-            spawnTrailParticles();
-
-            // Debug
-//            if(this.age % 1 == 0) {
-//                System.out.printf("[Tick %d] Vel: [X: %.4f, Y: %.4f, Z: %.4f] | Pos [X: %.4f, Y: %.4f, Z: %.4f] | Rot [X: %.4f, Y: %.4f, Z: %.4f, W: %.4f]%n",
-//                        this.age, vel.x, vel.y, vel.z, entityFeetPos.x, entityFeetPos.y, entityFeetPos.z, this.worldRotation.x, this.worldRotation.y, this.worldRotation.z, this.worldRotation.w);
-//            }
-            DebugUtil.logOnChange("ball is on ground", this.isOnGround());
-
-        } else {
-            /**
-             * Server-side Logic
-             */
-            BlockPos ballCenterPos = BlockPos.ofFloored(this.getPos().add(0, radius, 0));
-            BlockState stateAtBall = this.getWorld().getBlockState(ballCenterPos);
-
-            if (!stateAtBall.isAir()&& stateAtBall.getFluidState().isEmpty()) {
-                if (stateAtBall.isOf(Blocks.MOVING_PISTON)) {
-                    // Apply impulse if piston pushes
-                    if (this.getWorld().getBlockEntity(ballCenterPos) instanceof PistonBlockEntity piston) {
-                        Direction pushDir = piston.getMovementDirection();
-                        double launchSpeed = 0.8D;
-
-                        Vec3d impulse = Vec3d.of(pushDir.getVector()).multiply(launchSpeed);
-                        this.applyImpulse(impulse);
-                        return;
-                    }
-                } else if (stateAtBall.shouldSuffocate(this.getWorld(), ballCenterPos)) {
-                    // Drop as item if the ball is buried/inside a placed block
-                    this.dropStack(this.createStackFromEntity());
-                    this.discard();
-                    return;
-                }
+        if (!stateAtBall.isAir()&& stateAtBall.getFluidState().isEmpty()) {
+            if (stateAtBall.shouldSuffocate(this.getWorld(), ballCenterPos)) {
+                // Drop as item if the ball is buried/inside a placed block
+                this.dropStack(this.createStackFromEntity());
+                this.discard();
+                return;
             }
+        }
 
-            // Chunk loading logic
-            if (this.getWorld() instanceof ServerWorld serverWorld) {
-                boolean isMoving = this.getVelocity().lengthSquared() > 0.01;
-                ChunkPos currentChunk = new ChunkPos(this.getBlockPos());
+        // Chunk loading logic
+        if (this.getWorld() instanceof ServerWorld serverWorld) {
+            boolean isMoving = this.getVelocity().lengthSquared() > 0.01;
+            ChunkPos currentChunk = new ChunkPos(this.getBlockPos());
 
-                if (isMoving) {
-                    if (!currentChunk.equals(lastForcedChunk)) {
-                        if (lastForcedChunk != null) {
-                            serverWorld.setChunkForced(lastForcedChunk.x, lastForcedChunk.z, false);
-                        }
-                        serverWorld.setChunkForced(currentChunk.x, currentChunk.z, true);
-                        lastForcedChunk = currentChunk;
+            if (isMoving) {
+                if (!currentChunk.equals(lastForcedChunk)) {
+                    if (lastForcedChunk != null) {
+                        serverWorld.setChunkForced(lastForcedChunk.x, lastForcedChunk.z, false);
                     }
-                } else if (lastForcedChunk != null) {
-                    serverWorld.setChunkForced(lastForcedChunk.x, lastForcedChunk.z, false);
-                    lastForcedChunk = null;
+                    serverWorld.getChunkManager().addTicket(
+                            ChunkTicketType.POST_TELEPORT, currentChunk, 2, this.getId()
+                    );
+                    lastForcedChunk = currentChunk;
                 }
+            } else if (lastForcedChunk != null) {
+                serverWorld.setChunkForced(lastForcedChunk.x, lastForcedChunk.z, false);
+                lastForcedChunk = null;
             }
         }
     }
 
-    //Calculates smooth client-side rolling rotation using JOML Quaternionf.
-    public Quaternionf getPhysicsRotation(float tickDelta) {
-        // Smoothly interpolate rolling angle across frames (prevents jitter)
-        return new Quaternionf(this.prevWorldRotation).slerp(this.worldRotation, tickDelta);
-    }
+    private boolean tryInsertIntoHopper(HopperBlockEntity hopper) {
+        ItemStack stackToInsert = this.createStackFromEntity();
 
-    public void applyImpulse(Vec3d impulse) {
-        this.setVelocity(
-                GolfPhysicsEngine.applyImpulse(this.getVelocity(), impulse, physicsConfig.mass())
-        );
+        for (int i = 0; i < hopper.size(); i++) {
+            ItemStack slotStack = hopper.getStack(i);
 
-        this.setOnGround(false);
-        this.velocityModified = true;
-    }
-
-    public static GolfBallEntity getClosestBall(World world, Entity origin, double radius) {
-        double radiusSq = radius * radius;
-        Box searchBox = origin.getBoundingBox().expand(radius);
-        return world.getEntitiesByClass(GolfBallEntity.class, searchBox, b -> b.isAlive() && b.squaredDistanceTo(origin) <= radiusSq)
-                .stream()
-                .min(Comparator.comparingDouble(b -> b.squaredDistanceTo(origin)))
-                .orElse(null);
+            if (slotStack.isEmpty()) {
+                hopper.setStack(i, stackToInsert);
+                hopper.markDirty();
+                return true;
+            } else if (ItemStack.canCombine(slotStack, stackToInsert) && slotStack.getCount() < slotStack.getMaxCount()) {
+                slotStack.increment(1);
+                hopper.markDirty();
+                return true;
+            }
+        }
+        return false; // Hopper is full
     }
 
     private boolean isOccludedByBlock(PlayerEntity player) {
@@ -329,11 +517,88 @@ public class GolfBallEntity extends Entity {
         }
     }
 
-    //    @Override
-    //    public boolean isSilent() {
-    //        return true;
-    //    }
+    /**
+     * public methods
+     */
+    //Calculates smooth client-side rolling rotation using JOML Quaternionf.
+    public Quaternionf getPhysicsRotation(float tickDelta) {
+        // Smoothly interpolate rolling angle across frames (prevents jitter)
+        return new Quaternionf(this.prevWorldRotation).slerp(this.worldRotation, tickDelta);
+    }
 
+    public void applyImpulse(Vec3d impulse) {
+        if (this.hasVehicle()) {
+            this.mountCooldown = 4;
+            this.stopRiding(); // Detach from boat/minecart before launching
+        }
+
+        this.setVelocity(
+                GolfPhysicsEngine.applyImpulse(this.getVelocity(), impulse, physicsConfig.mass())
+        );
+
+        this.wakeUp();
+        this.setOnGround(false);
+        this.velocityModified = true;
+    }
+
+    public static GolfBallEntity getClosestBall(World world, PlayerEntity player, double radius, boolean checkOwnership) {
+        double radiusSq = radius * radius;
+        Box searchBox = player.getBoundingBox().expand(radius);
+
+        return world.getEntitiesByClass(
+                        GolfBallEntity.class,
+                        searchBox,
+                        ball -> ball.isAlive()
+                                && ball.squaredDistanceTo(player) <= radiusSq
+                                && (!checkOwnership || ball.isOwner(player))
+                )
+                .stream()
+                .min(Comparator.comparingDouble(ball -> ball.squaredDistanceTo(player)))
+                .orElse(null);
+    }
+
+    //Entity → Item
+    public ItemStack createStackFromEntity() {
+        ItemStack ballStack = new ItemStack(RegisterItems.GOLF_BALL);
+
+        // Pass name
+        if (this.hasCustomName()) {
+            ballStack.setCustomName(this.getCustomName());
+        }
+        // Pass first strike time
+        if (this.startTime > 0L) {
+            ballStack.getOrCreateNbt().putLong("StartTime", this.startTime);
+        }
+        // Pass UUID
+        if (this.hasOwner()) {
+            ballStack.getOrCreateNbt().putUuid("OwnerUUID", this.getOwnerUuid().get());
+        }
+        // Pass isgoal
+        if (this.isGoaled()) {
+            ballStack.getOrCreateNbt().putBoolean("IsGoaled", true);
+        }
+        // Pass hitcount
+        if (this.getHitCount() > 0) {
+            ballStack.getOrCreateNbt().putInt("HitCount", this.getHitCount());
+        }
+        // Pass color
+        int ballColor = this.getColor();
+        if (ballColor != -1) {
+            RegisterItems.GOLF_BALL.setColor(ballStack, ballColor);
+        }
+        // Wipe empty NBT compound
+        GolfBall.sanitizeNbt(ballStack);
+        return ballStack;
+    }
+
+    public void wakeUp() {
+        this.setSleeping(false);
+        this.sleepCheckTimer = 0;
+    }
+
+    /**
+     *  Overrides
+     */
     // Protect from environmental destruction (fire, cactus, explosions, etc.)
     @Override
     public boolean isInvulnerableTo(DamageSource damageSource) {
@@ -355,6 +620,18 @@ public class GolfBallEntity extends Entity {
     public boolean canHit() {
         // Allows the player's crosshair to target and hit the ball (left-click or right-click)
         return !this.isRemoved();
+    }
+
+    @Override
+    public void move(MovementType type, Vec3d movement) {
+        super.move(type, movement);
+        this.wakeUp();
+        if (type == MovementType.PISTON) {
+            if (movement.lengthSquared() > 1e-6) {
+                Vec3d pushDir = movement.normalize();
+                this.applyImpulse(pushDir.multiply(0.8D));
+            }
+        }
     }
 
     @Override
@@ -394,9 +671,13 @@ public class GolfBallEntity extends Entity {
             if (this.hasCustomName()) {
                 ballStack.setCustomName(this.getCustomName());
             }
+            // Pass UUID
+            if (this.hasOwner()) {
+                ballStack.getOrCreateNbt().putUuid("OwnerUUID", this.getOwnerUuid().get());
+            }
             // Pass color
             int ballColor = this.getColor();
-            if (ballColor != -1 && ballColor != 0xFFFFFF && ballColor != 0xF9FFFE) {
+            if (ballColor != -1) {
                 RegisterItems.GOLF_BALL.setColor(ballStack, ballColor);
             } else {
                 RegisterItems.GOLF_BALL.removeColor(ballStack); // Ensures clean, stackable item
@@ -419,32 +700,6 @@ public class GolfBallEntity extends Entity {
         return true;
     }
 
-    //Entity → Item
-    public ItemStack createStackFromEntity() {
-        ItemStack ballStack = new ItemStack(RegisterItems.GOLF_BALL);
-
-        // Pass name
-        if (this.hasCustomName()) {
-            ballStack.setCustomName(this.getCustomName());
-        }
-        // Pass isgoal
-        if (this.isGoaled()) {
-            ballStack.getOrCreateNbt().putBoolean("IsGoaled", true);
-        }
-        // Pass hitcount
-        if (this.getHitCount() > 0) {
-            ballStack.getOrCreateNbt().putInt("HitCount", this.getHitCount());
-        }
-        // Pass color
-        int ballColor = this.getColor();
-        if (ballColor != -1 && ballColor != 0xFFFFFF && ballColor != 0xF9FFFE) {
-            RegisterItems.GOLF_BALL.setColor(ballStack, ballColor);
-        }
-        // Wipe empty NBT compound
-        GolfBall.sanitizeNbt(ballStack);
-        return ballStack;
-    }
-
     // Give Name Tag
     @Override
     public ActionResult interact(PlayerEntity player, Hand hand) {
@@ -455,6 +710,7 @@ public class GolfBallEntity extends Entity {
             if (!this.getWorld().isClient()) {
                 this.setCustomName(stack.getName());
                 this.setCustomNameVisible(true);
+                this.setOwnerUuid(player.getUuid());
 
                 if (!player.getAbilities().creativeMode) {
                     stack.decrement(1);
@@ -467,23 +723,18 @@ public class GolfBallEntity extends Entity {
     }
 
     @Override
-    public Text getDisplayName() {
-        int hits = this.getHitCount();
-
-        // Create the grey hit count text: "(Hits: 3)"
-        Text hitText;
-        if (this.isGoaled()) {
-            hitText = Text.literal(" (Hits: " + hits + ")").formatted(Formatting.GOLD);
-        } else{
-            hitText = Text.literal(" (Hits: " + hits + ")").formatted(Formatting.GRAY);
+    public void addVelocity(double deltaX, double deltaY, double deltaZ) {
+        super.addVelocity(deltaX, deltaY, deltaZ);
+        if (deltaX != 0 || deltaY != 0 || deltaZ != 0) {
+            this.wakeUp(); // Wake up on explosions
         }
+    }
 
-        if (this.hasCustomName()) {
-            // If name-tagged: "CustomName (Hits: 3)"
-            return Text.empty().append(this.getCustomName()).append(hitText);
-        } else {
-            // Default: "Golf Ball (Hits: 3)"
-            return Text.translatable("entity.mygolf.golf_ball").append(hitText);
+    @Override
+    public void setVelocity(Vec3d velocity) {
+        super.setVelocity(velocity);
+        if (velocity != null && velocity.lengthSquared() > 1e-6) {
+            this.wakeUp();
         }
     }
 
@@ -491,17 +742,35 @@ public class GolfBallEntity extends Entity {
     @Override
     public boolean isGlowing() {
         if (this.getWorld().isClient()) {
-            net.minecraft.client.MinecraftClient client = net.minecraft.client.MinecraftClient.getInstance();
-            if (client.player != null) {
-                double distance = this.squaredDistanceTo(client.player);
-
-                if (distance <= 64.0 * 64.0) {
-                    boolean isSlow = this.getVelocity().lengthSquared() <= SPEED_THRESHOLD_SQ;
-                    return isSlow && isOccludedByBlock(client.player);
-                }
+            // Gets the client player currently loaded in this world without touching MinecraftClient
+            PlayerEntity clientPlayer = this.getWorld().getClosestPlayer(this, 64.0D);
+            if (clientPlayer != null) {
+                return this.getVelocity().lengthSquared() <= SPEED_THRESHOLD_SQ
+                        && isOccludedByBlock(clientPlayer);
             }
         }
         return super.isGlowing();
+    }
+
+    @Override
+    protected boolean canStartRiding(Entity vehicle) {
+        return vehicle instanceof BoatEntity || vehicle instanceof AbstractMinecartEntity;
+    }
+    @Override
+    public double getHeightOffset() {
+        // Elevates the ball's origin out of the vehicle floor
+        if (this.getVehicle() instanceof BoatEntity) {
+            return 0.30D; // Adjust up/down as needed for boat seats
+        } else if (this.getVehicle() instanceof AbstractMinecartEntity) {
+            return 0.30D; // Adjust up/down for minecarts
+        }
+        return super.getHeightOffset();
+    }
+    @Override
+    public float getTargetingMargin() {
+        // Inflates the crosshair raycast box while mounted so the ray hits the ball
+        // before or equal to the surrounding vehicle's hull box
+        return this.hasVehicle() ? 0.2F : 0.05F;
     }
 
     @Override
@@ -512,6 +781,11 @@ public class GolfBallEntity extends Entity {
     @Override
     public boolean isCollidable() {
         return false;
+    }
+
+    @Override
+    public Packet<ClientPlayPacketListener> createSpawnPacket() {
+        return new EntitySpawnS2CPacket(this);
     }
 
     @Override
@@ -533,6 +807,8 @@ public class GolfBallEntity extends Entity {
         this.dataTracker.startTracking(HIT_COUNT, 0);
         this.dataTracker.startTracking(IS_GOALED, false);
         this.dataTracker.startTracking(SPIN_VECTOR, new Vector3f(0.0f, 0.0f, 0.0f));
+        this.dataTracker.startTracking(OWNER_UUID, Optional.empty());
+        this.dataTracker.startTracking(IS_SLEEPING, false);
     }
 
     @Override
@@ -546,6 +822,14 @@ public class GolfBallEntity extends Entity {
         if (nbt.contains("IsGoaled")) {
             this.setGoaled(nbt.getBoolean("IsGoaled"));
         }
+        if (nbt.contains("SpinX")) {
+            this.setSpin(new Vec3d(nbt.getDouble("SpinX"), nbt.getDouble("SpinY"), nbt.getDouble("SpinZ")));
+        }
+        if (nbt.containsUuid("OwnerUUID")) {
+            this.setOwnerUuid(nbt.getUuid("OwnerUUID"));
+        }if (nbt.contains("StartTime")) {
+            this.startTime = nbt.getLong("StartTime");
+        }
     }
 
     @Override
@@ -553,5 +837,11 @@ public class GolfBallEntity extends Entity {
         nbt.putInt("Color", this.getColor());
         nbt.putInt("HitCount", this.getHitCount());
         nbt.putBoolean("IsGoaled", this.isGoaled());
+        Vec3d spin = this.getSpin();
+        nbt.putDouble("SpinX", spin.x);
+        nbt.putDouble("SpinY", spin.y);
+        nbt.putDouble("SpinZ", spin.z);
+        this.getOwnerUuid().ifPresent(uuid -> nbt.putUuid("OwnerUUID", uuid));
+        nbt.putLong("StartTime", this.startTime);
     }
 }

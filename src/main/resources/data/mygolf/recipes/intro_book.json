@@ -1,0 +1,20 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "ingredients": [
+    {
+      "item": "minecraft:book"
+    },
+    [
+      {
+        "item": "mygolf:golf_ball"
+      },
+      {
+        "item": "mygolf:golf_club_item"
+      }
+    ]
+  ],
+  "result": {
+    "item": "mygolf:intro_book",
+    "count": 1
+  }
+}

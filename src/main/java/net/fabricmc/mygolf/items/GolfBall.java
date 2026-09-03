@@ -31,8 +31,6 @@ import java.util.List;
 public class GolfBall extends BaseItem implements DyeableItem {
 
     static int maxCount = 64;    //最大堆叠数量
-    private static final int PURE_WHITE = 0xFFFFFF;
-    private static final int VANILLA_WHITE = 0xF9FFFE;   // DyeColor.WHITE
     private final GolfPhysicsEngine.Config physicsConfig = GolfPhysicsEngine.Config.STANDARD_BALL;
 
 
@@ -77,71 +75,68 @@ public class GolfBall extends BaseItem implements DyeableItem {
             final var golfBallEntity = new GolfBallEntity(RegisterEntities.GOLF_BALL, level);
             final double radius = physicsConfig.radius();
 
-            if (hitResult.getType() == HitResult.Type.BLOCK) {
-                if (user.isInSneakingPose()){
-                    final Direction side = hitResult.getSide();
-                    final Vec3d hitPos = hitResult.getPos();
-                    final BlockPos blockPos = hitResult.getBlockPos();
+            if (user.isInSneakingPose() && hitResult.getType() == HitResult.Type.BLOCK) {
+                final Direction side = hitResult.getSide();
+                final Vec3d hitPos = hitResult.getPos();
+                final BlockPos blockPos = hitResult.getBlockPos();
 
-                    double spawnX = hitPos.x + (side.getOffsetX() * (radius + 0.01));
-                    double spawnY = hitPos.y;
-                    double spawnZ = hitPos.z + (side.getOffsetZ() * (radius + 0.01));
+                double spawnX = hitPos.x + (side.getOffsetX() * (radius + 0.01));
+                double spawnY = hitPos.y;
+                double spawnZ = hitPos.z + (side.getOffsetZ() * (radius + 0.01));
 
-                    if (side == Direction.UP) {
-                        spawnY = hitPos.y;
-                    } else if (side == Direction.DOWN) {
-                        spawnY = hitPos.y - golfBallEntity.getHeight() - 0.01;
-                    }
+                if (side == Direction.UP) {
+                    spawnY = hitPos.y;
+                } else if (side == Direction.DOWN) {
+                    spawnY = hitPos.y - golfBallEntity.getHeight() - 0.01;
+                }
 
-                    // Set initial trial position
-                    golfBallEntity.updatePosition(spawnX, spawnY, spawnZ);
+                // Set initial trial position
+                golfBallEntity.updatePosition(spawnX, spawnY, spawnZ);
 
-                    // Resolve wall clipping against hollow/complex block geometry (Composters, Cauldrons, Hoppers)
-                    VoxelShape blockShape = level.getBlockState(blockPos).getCollisionShape(level, blockPos);
-                    if (!blockShape.isEmpty()) {
+                // Resolve wall clipping against hollow/complex block geometry (Composters, Cauldrons, Hoppers)
+                VoxelShape blockShape = level.getBlockState(blockPos).getCollisionShape(level, blockPos);
+                if (blockShape.isEmpty()) {
+                    blockShape = level.getBlockState(blockPos).getOutlineShape(level, blockPos);
+                }
+
+                if (!blockShape.isEmpty()) {
+                    for (Box wallBox : blockShape.getBoundingBoxes()) {
+                        Box worldWallBox = wallBox.offset(blockPos);
                         Box ballBox = golfBallEntity.getBoundingBox();
 
-                        for (Box wallBox : blockShape.getBoundingBoxes()) {
-                            Box worldWallBox = wallBox.offset(blockPos);
+                        // Check if ball intersects interior wall box
+                        if (ballBox.intersects(worldWallBox)) {
+                            // Nudge X/Z outward away from nearest wall edge
+                            double minXDist = Math.abs((spawnX - radius) - worldWallBox.maxX);
+                            double maxXDist = Math.abs((spawnX + radius) - worldWallBox.minX);
+                            double minZDist = Math.abs((spawnZ - radius) - worldWallBox.maxZ);
+                            double maxZDist = Math.abs((spawnZ + radius) - worldWallBox.minZ);
 
-                            // Check if ball intersects interior wall box
-                            if (ballBox.intersects(worldWallBox)) {
-                                // Nudge X/Z outward away from nearest wall edge
-                                double minXDist = Math.abs((spawnX - radius) - worldWallBox.maxX);
-                                double maxXDist = Math.abs((spawnX + radius) - worldWallBox.minX);
-                                double minZDist = Math.abs((spawnZ - radius) - worldWallBox.maxZ);
-                                double maxZDist = Math.abs((spawnZ + radius) - worldWallBox.minZ);
+                            double minDist = Math.min(Math.min(minXDist, maxXDist), Math.min(minZDist, maxZDist));
 
-                                double minDist = Math.min(Math.min(minXDist, maxXDist), Math.min(minZDist, maxZDist));
+                            if (minDist == minXDist) spawnX = worldWallBox.maxX + radius + 0.001;
+                            else if (minDist == maxXDist) spawnX = worldWallBox.minX - radius - 0.001;
+                            else if (minDist == minZDist) spawnZ = worldWallBox.maxZ + radius + 0.001;
+                            else if (minDist == maxZDist) spawnZ = worldWallBox.minZ - radius - 0.001;
 
-                                if (minDist == minXDist) spawnX = worldWallBox.maxX + radius + 0.001;
-                                else if (minDist == maxXDist) spawnX = worldWallBox.minX - radius - 0.001;
-                                else if (minDist == minZDist) spawnZ = worldWallBox.maxZ + radius + 0.001;
-                                else if (minDist == maxZDist) spawnZ = worldWallBox.minZ - radius - 0.001;
-                            }
+                            golfBallEntity.updatePosition(spawnX, spawnY, spawnZ);
                         }
                     }
-
-                    // Apply clean position and zero out any residual velocity
-                    golfBallEntity.updatePosition(spawnX, spawnY, spawnZ);
-                    golfBallEntity.setVelocity(Vec3d.ZERO);
-                    golfBallEntity.setOnGround(side == Direction.UP);
-
-                }else {
-                    final var unit = hitResult.getPos().subtract(user.getPos()).normalize();
-                    golfBallEntity.updatePosition(user.getPos().x + unit.x, user.getPos().y + user.getStandingEyeHeight(), user.getPos().z + unit.z);
-
                 }
+                golfBallEntity.setVelocity(Vec3d.ZERO);
+                golfBallEntity.setOnGround(side == Direction.UP);
+
             }else {
-                golfBallEntity.updatePosition(hitResult.getPos().x, hitResult.getPos().y, hitResult.getPos().z);
+                final var unit = hitResult.getPos().subtract(user.getPos()).normalize();
+                golfBallEntity.updatePosition(user.getPos().x + unit.x, user.getPos().y + user.getStandingEyeHeight(), user.getPos().z + unit.z);
+
             }
 
             // Apply the dyed item color to the spawned entity
             if (RegisterItems.GOLF_BALL.hasColor(itemStack)) {
                 int itemColor = RegisterItems.GOLF_BALL.getColor(itemStack);
-
                 // Treat white as undyed (-1)
-                if (itemColor == 0xFFFFFF || itemColor == 0xF9FFFE) {
+                if (itemColor == 0xFFFFFF) {
                     golfBallEntity.setColor(-1);
                 } else {
                     golfBallEntity.setColor(itemColor);
@@ -155,13 +150,25 @@ public class GolfBall extends BaseItem implements DyeableItem {
                 golfBallEntity.setCustomName(itemStack.getName());
             }
 
-            // Pass IsGoaled and HitCount
             if (itemStack.hasNbt()) {
-                if (itemStack.getNbt().contains("IsGoaled")) {
-                    golfBallEntity.setGoaled(itemStack.getNbt().getBoolean("IsGoaled"));
-                }
-                if (itemStack.getNbt().contains("HitCount")) {
-                    golfBallEntity.setHitCount(itemStack.getNbt().getInt("HitCount"));
+                var nbt = itemStack.getNbt();
+                if (nbt != null) {
+                    // Pass time
+                    if (nbt.contains("StartTime")) {
+                        golfBallEntity.setStartTime(nbt.getLong("StartTime"));
+                    }
+                    // Pass player UUID
+                    if (nbt.containsUuid("OwnerUUID")) {
+                        golfBallEntity.setOwnerUuid(itemStack.getNbt().getUuid("OwnerUUID"));
+                    }
+                    // Pass IsGoaled
+                    if (nbt.contains("IsGoaled")) {
+                        golfBallEntity.setGoaled(itemStack.getNbt().getBoolean("IsGoaled"));
+                    }
+                    // Pass HitCount
+                    if (nbt.contains("HitCount")) {
+                        golfBallEntity.setHitCount(itemStack.getNbt().getInt("HitCount"));
+                    }
                 }
             }
 
@@ -178,23 +185,22 @@ public class GolfBall extends BaseItem implements DyeableItem {
     // Default color if undyed (White)
     @Override
     public int getColor(ItemStack stack) {
-        NbtCompound nbt = stack.getSubNbt(DISPLAY_KEY);
-        if (nbt != null && nbt.contains(COLOR_KEY, 99)) {
-            return nbt.getInt(COLOR_KEY);
-        }
-        return 0xFFFFFF; // Default White
-    }
-    public static boolean isGoaled(ItemStack stack) {
-        return stack != null && !stack.isEmpty() && stack.hasNbt() && stack.getNbt().getBoolean("IsGoaled");
+        return hasColor(stack) ? DyeableItem.super.getColor(stack) : 0xFFFFFF; // Default White
     }
 
     @Override
     public void setColor(ItemStack stack, int color) {
-        if (color == PURE_WHITE || color == VANILLA_WHITE) {
+        if (color == 0xFFFFFF) {
             this.removeColor(stack); // Strips 'display.color' NBT entirely
         } else {
             DyeableItem.super.setColor(stack, color);
         }
+    }
+
+    @Override
+    public void removeColor(ItemStack stack) {
+        DyeableItem.super.removeColor(stack);
+        sanitizeNbt(stack); // Ensures empty 'display' tags are deleted immediately
     }
 
     public static void sanitizeNbt(ItemStack stack) {
@@ -205,6 +211,7 @@ public class GolfBall extends BaseItem implements DyeableItem {
         // 1. If no custom name exists, strip Anvil RepairCost and empty display tags
         if (!stack.hasCustomName()) {
             nbt.remove("RepairCost");
+            nbt.remove("OwnerUUID");
 
             if (nbt.contains("display")) {
                 NbtCompound display = nbt.getCompound("display");

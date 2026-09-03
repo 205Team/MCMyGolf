@@ -2,6 +2,7 @@ package net.fabricmc.mygolf.registry;
 
 import net.fabricmc.fabric.api.object.builder.v1.block.entity.FabricBlockEntityTypeBuilder;
 import net.fabricmc.mygolf.blockEntity.FlagstickEntity;
+import net.fabricmc.mygolf.blockEntity.GolfHoleEntity;
 import net.fabricmc.mygolf.global.CommonStr;
 import net.minecraft.block.entity.BlockEntityType;
 import net.minecraft.registry.Registries;
@@ -10,13 +11,18 @@ import net.minecraft.util.Identifier;
 
 public class RegisterBlockEntities {
     public static BlockEntityType<FlagstickEntity> FLAGSTICK_ENTITY;
-    public static BlockEntityType<FlagstickEntity> GOLF_HOLE_ENTITY;
+    public static BlockEntityType<GolfHoleEntity> GOLF_HOLE_ENTITY;
 
     public static void registerBlockEntities() {
         FLAGSTICK_ENTITY = Registry.register(
                 Registries.BLOCK_ENTITY_TYPE,
                 new Identifier(CommonStr.modId, "flagstick_entity"),
                 FabricBlockEntityTypeBuilder.create(FlagstickEntity::new, RegisterBlocks.FLAGSTICK_BLOCK).build()
+        );
+        GOLF_HOLE_ENTITY = Registry.register(
+                Registries.BLOCK_ENTITY_TYPE,
+                new Identifier(CommonStr.modId, "golf_hole_entity"),
+                FabricBlockEntityTypeBuilder.create(GolfHoleEntity::new, RegisterBlocks.GOLF_HOLE).build()
         );
     }
 

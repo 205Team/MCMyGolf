@@ -1,9 +1,9 @@
 {
   "type": "minecraft:crafting_shaped",
   "pattern": [
-    "FL ",
-    "LW ",
-    "   "
+    "WLW",
+    "LFL",
+    "WLW"
   ],
   "key": {
     "F": {

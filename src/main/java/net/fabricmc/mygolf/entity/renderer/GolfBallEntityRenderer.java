@@ -18,7 +18,10 @@ import net.minecraft.client.render.entity.EntityRendererFactory;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.ItemStack;
+import net.minecraft.text.MutableText;
+import net.minecraft.text.Style;
 import net.minecraft.text.Text;
+import net.minecraft.util.Formatting;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.RotationAxis;
@@ -43,6 +46,7 @@ public class GolfBallEntityRenderer extends EntityRenderer<GolfBallEntity> {
         this.shadowRadius = 0.15F;
     }
 
+    @Override
     public void render(GolfBallEntity ballEntity, float yaw, float tickDelta, MatrixStack matrixStack, VertexConsumerProvider vertexConsumers, int light) {
 
         ClientPlayerEntity player = MinecraftClient.getInstance().player;
@@ -103,13 +107,18 @@ public class GolfBallEntityRenderer extends EntityRenderer<GolfBallEntity> {
 
     private void renderJumpy(GolfBallEntity ballEntity, float tickDelta, MatrixStack matrixStack) {
 
-        // Render dynamic hop arc scaled by current hop height
         float remainingTicks = Math.max(0.0F, (float) ballEntity.getJumpTicks() - tickDelta);
         if (remainingTicks > 0.0F) {
-            float totalDuration = 8.0F;
-            float progress = 1.0F - (remainingTicks / totalDuration);
+            float hopDuration = 8.0F;
 
-            // Dynamically scale peak height using hopHeight (0.125m -> 0.25m -> 0.375m)
+            // Modulo prevents negative progress when ticks exceed 8
+            float ticksInCurrentHop = remainingTicks % hopDuration;
+            if (ticksInCurrentHop == 0.0F && remainingTicks > 0.0F) {
+                ticksInCurrentHop = hopDuration; // Handle exact boundary frames
+            }
+
+            float progress = 1.0F - (ticksInCurrentHop / hopDuration);
+
             float maxHop = ballEntity.getHopHeight();
             float yOffset = MathHelper.sin(progress * (float) Math.PI) * maxHop;
 
@@ -215,7 +224,7 @@ public class GolfBallEntityRenderer extends EntityRenderer<GolfBallEntity> {
         if (!(activeStack.getItem() instanceof GolfClubItem)) return;
 
         // Verify this entity is the closest ball to the player
-        GolfBallEntity closestBall = GolfBallEntity.getClosestBall(player.getWorld(), player, GolfBallEntity.MIN_RADIUS);
+        GolfBallEntity closestBall = GolfBallEntity.getClosestBall(player.getWorld(), player, GolfBallEntity.MIN_RADIUS, true);
         if (closestBall != ballEntity) return;
 
         // Calculate charge power ratio
@@ -253,7 +262,7 @@ public class GolfBallEntityRenderer extends EntityRenderer<GolfBallEntity> {
         if (GolfBallEntity.ENABLE_MAGNUS_EFFECT) {
             float yawRad = (float) Math.toRadians(player.getYaw());
             double loftMagnitude = Math.abs(currentLoft);
-            double backspinIntensity = finalSpeed * Math.sin(Math.toRadians(loftMagnitude)) * 0.15;
+            double backspinIntensity = finalSpeed * Math.sin(Math.toRadians(loftMagnitude)) * 1.5;
             initialSpin = new Vec3d(-Math.cos(yawRad) * backspinIntensity, 0.0, -Math.sin(yawRad) * backspinIntensity);
         }
 
@@ -310,7 +319,7 @@ public class GolfBallEntityRenderer extends EntityRenderer<GolfBallEntity> {
         }
 
         // Only render for the ball closest to the player
-        GolfBallEntity closestBall = GolfBallEntity.getClosestBall(player.getWorld(), player, GolfBallEntity.MIN_RADIUS);
+        GolfBallEntity closestBall = GolfBallEntity.getClosestBall(player.getWorld(), player, GolfBallEntity.MIN_RADIUS, true);
         if (closestBall != ballEntity) return;
 
         // Tilt arrow upward according to club loft angle
@@ -428,11 +437,7 @@ public class GolfBallEntityRenderer extends EntityRenderer<GolfBallEntity> {
             return false;
         }
 
-        GolfBallEntity closestBall = GolfBallEntity.getClosestBall(
-                player.getWorld(),
-                player,
-                GolfBallEntity.MIN_RADIUS
-        );
+        GolfBallEntity closestBall = GolfBallEntity.getClosestBall(player.getWorld(),player,GolfBallEntity.MIN_RADIUS, false);
 
         return entity == closestBall;
     }
@@ -443,6 +448,31 @@ public class GolfBallEntityRenderer extends EntityRenderer<GolfBallEntity> {
         if (squaredDistance > 4096.0D) {
             return;
         }
+
+        MutableText customLabel = entity.hasCustomName()
+                ? entity.getCustomName().copy()
+                : Text.translatable("entity.mygolf.golf_ball_entity");
+        if (entity.hasOwner()) {
+            PlayerEntity localPlayer = MinecraftClient.getInstance().player;
+            if (localPlayer != null && entity.isOwner(localPlayer)) {
+                customLabel.setStyle(customLabel.getStyle().withColor(0x82e782));//green
+            } else {
+                customLabel.setStyle(customLabel.getStyle().withColor(0xD96C2A));//red
+            }
+        } else {
+            customLabel.setStyle(customLabel.getStyle().withColor(0xC5E2E4));//mint
+        }
+
+        int hits = entity.getHitCount();
+        int hitColor = entity.isGoaled() ? 0xECA758 : 0xC5E2E4;//gold/mint
+        String prefix = "[";
+        String suffix = entity.isGoaled() ? "]⛳" : "]";
+        Text dotSeparator = Text.literal("•").setStyle(Style.EMPTY.withColor(0xFFFFFF));
+        Text counterText = Text.literal(prefix + hits + suffix).setStyle(Style.EMPTY.withColor(hitColor));
+        Text hitText = Text.empty().append(dotSeparator).append(counterText);
+
+
+        Text finalText = customLabel.append(hitText);
 
         matrices.push();
 
@@ -462,13 +492,13 @@ public class GolfBallEntityRenderer extends EntityRenderer<GolfBallEntity> {
         int backgroundColor = (int) (backgroundAlpha * 255.0F) << 24;
 
         TextRenderer textRenderer = this.getTextRenderer();
-        float xOffset = -textRenderer.getWidth(text) / 2.0F;
+        float xOffset = -textRenderer.getWidth(finalText) / 2.0F;
 
         textRenderer.draw(
-                text,
+                finalText,
                 xOffset,
                 0,
-                0x20FFFFFF, // Dimmed see-through text color (ARGB)
+                -1,
                 false,
                 matrix4f,
                 vertexConsumers,
@@ -479,7 +509,7 @@ public class GolfBallEntityRenderer extends EntityRenderer<GolfBallEntity> {
 
         // 4. Render label text
         textRenderer.draw(
-                text,
+                finalText,
                 xOffset,
                 0,
                 0xDFFFFFFF, // White text with full opacity

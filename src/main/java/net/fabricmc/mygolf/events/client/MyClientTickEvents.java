@@ -10,6 +10,7 @@ public class MyClientTickEvents {
      */
     public static void registerEvents() {
         registerEvent(GolfBallUIEvents.golfBallArrowRenderEvent());
+        registerEvent(GolfClubEvents.golfClubUndoEvent());
     }
 
     /**

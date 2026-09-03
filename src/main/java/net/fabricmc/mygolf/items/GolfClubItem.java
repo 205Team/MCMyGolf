@@ -33,6 +33,7 @@ public class GolfClubItem extends Item implements ItemAbstract {
     public static final int MAX_LOOPS = 3; // Maximum allowed loops
     public static final double MAX_SHOT_POWER = 3.0; // Max speed multiplier
     public static final int COOLDOWN_TICKS = 15; // * 0.05 second cooldown
+    public static final float MIN_POWER_RATIO = 0.01f; // 5% minimum power floor
 
     public GolfClubItem(Item.Settings settings) {
         super(settings);
@@ -72,6 +73,15 @@ public class GolfClubItem extends Item implements ItemAbstract {
         if (heldTicks < MIN_CHARGE_TICKS) return;
         float currentLoft = getSelectedLoft(stack);
 
+        // Find closest GolfBallEntity within set radius of the player
+        GolfBallEntity targetBall = GolfBallEntity.getClosestBall(world, player, GolfBallEntity.MIN_RADIUS, true);
+
+        if (targetBall != null) {
+            world.playSound(player, player.getBlockPos(), RegisterSounds.GOLF_BALL_HIT_SOUND_EVENT, SoundCategory.PLAYERS, 1f, 1f);
+        } else {
+            world.playSound(player, player.getBlockPos(), RegisterSounds.GOLF_CLUB_SWING_SOUND_EVENT, SoundCategory.PLAYERS, 1f, 1f);
+        }
+
         if (!world.isClient()) {
             int chargeTicks = heldTicks - MIN_CHARGE_TICKS;
             int maxAllowedTicks = MAX_CHARGE_TICKS * MAX_LOOPS;
@@ -79,15 +89,14 @@ public class GolfClubItem extends Item implements ItemAbstract {
             float powerRatio;
             if (chargeTicks >= maxAllowedTicks) {
                 // Capped: Exceeded 3 full loops -> force random shot power
-                powerRatio = 0.01f + world.getRandom().nextFloat() * 0.99f;
+                powerRatio = MIN_POWER_RATIO + world.getRandom().nextFloat() * (1.0f - MIN_POWER_RATIO);
             } else {
                 powerRatio = calculatePowerRatio(chargeTicks, currentLoft);
             }
 
-            // Find closest GolfBallEntity within 4 blocks of the player
-            GolfBallEntity targetBall = GolfBallEntity.getClosestBall(world, player, GolfBallEntity.MIN_RADIUS);
-
             if (targetBall != null) {
+                // Save pos snapshot
+                saveUndoSnapshot(stack, targetBall);
 
                 // Calculate direction vector using player's horizontal yaw and club loft
                 Vec3d launchDir = Vec3d.fromPolar(currentLoft, player.getYaw());
@@ -102,7 +111,7 @@ public class GolfClubItem extends Item implements ItemAbstract {
                     float yawRad = (float) Math.toRadians(player.getYaw());
 
                     // Backspin scales with shot speed and loft angle steepness
-                    double loftMagnitude = Math.abs(currentLoft); // e.g. 5.0 to 75.0
+                    double loftMagnitude = Math.abs(currentLoft);
                     double backspinIntensity = finalSpeed * Math.sin(Math.toRadians(loftMagnitude)) * 1.5;
 
                     // Transform local shot spin to world-space spin vector
@@ -114,14 +123,22 @@ public class GolfClubItem extends Item implements ItemAbstract {
                 } else {
                     targetBall.setSpin(Vec3d.ZERO);
                 }
-                playHitSound(world, player);
-
-            }else {
-                playSwingSound(world, player);
 
             }
 
             player.getItemCooldownManager().set(this, COOLDOWN_TICKS);
+        }
+    }
+
+    private void saveUndoSnapshot(ItemStack clubStack, GolfBallEntity ballEntity) {
+        if (!ballEntity.getWorld().isClient) {
+            // 1. Write snapshot into Club Item NBT
+            NbtCompound nbt = clubStack.getOrCreateNbt();
+            nbt.putUuid("UndoBallUuid", ballEntity.getUuid());
+            nbt.putDouble("UndoX", ballEntity.getX());
+            nbt.putDouble("UndoY", ballEntity.getY());
+            nbt.putDouble("UndoZ", ballEntity.getZ());
+            nbt.putBoolean("HasUndo", true);
         }
     }
 
@@ -172,22 +189,9 @@ public class GolfClubItem extends Item implements ItemAbstract {
         float lowLoftExponent = 2.2f;
         float highLoftExponent = 0.45f;
         float exponent = lowLoftExponent + (highLoftExponent - lowLoftExponent) * normalizedLoft;
+        float rawPower = (float) Math.pow(linearProgress, exponent);
 
-        return (float) Math.pow(linearProgress, exponent);
-    }
-
-    // 播放击球声音
-    private void playHitSound(World world, PlayerEntity player) {
-        if (!world.isClient) {
-            world.playSound(null, player.getBlockPos(), RegisterSounds.GOLF_BALL_HIT_SOUND_EVENT, SoundCategory.BLOCKS, 1f, 1f);
-        }
-    }
-
-    // 播放挥空声音
-    private void playSwingSound(World world, PlayerEntity player) {
-        if (!world.isClient) {
-            world.playSound(null, player.getBlockPos(), RegisterSounds.GOLF_CLUB_SWING_SOUND_EVENT, SoundCategory.BLOCKS, 1f, 1f);
-        }
+        return MIN_POWER_RATIO + rawPower * (1.0f - MIN_POWER_RATIO);
     }
 
     // 重写 getMaxUseTime 方法，返回蓄力最长时间
