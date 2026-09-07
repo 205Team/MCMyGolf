@@ -1,0 +1,13 @@
+{
+  "providers": [
+    {
+      "type": "bitmap",
+      "file": "mygolf:gui/num_font.png",
+      "height": 5,
+      "ascent": 5,
+      "chars": [
+        "0123456789\u00B0"
+      ]
+    }
+  ]
+}

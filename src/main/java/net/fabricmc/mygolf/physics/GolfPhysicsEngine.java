@@ -8,7 +8,6 @@ import net.minecraft.block.Blocks;
 import net.minecraft.registry.tag.BlockTags;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Box;
-import net.minecraft.util.math.Direction;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.util.shape.VoxelShape;
 import net.minecraft.world.World;
@@ -40,7 +39,7 @@ public class GolfPhysicsEngine {
         );
     }
 
-    public record SphereCollision(Vec3d resolvedPos, Vec3d normal, boolean hit) {}
+    public record SphereCollision(Vec3d resolvedPos, Vec3d normal, boolean hit, boolean isStepUp, double stepHeight) {}
 
     /**
      * Integrates one tick of flight, drag, Magnus forces, and continuous collision response.
@@ -81,10 +80,6 @@ public class GolfPhysicsEngine {
             spin = spin.add(targetSpin.subtract(spin).multiply(gripFactor));
 
             if (newVel.lengthSquared() < 1e-6) {
-                // Check hole entry when stationary
-                if (isRealTick) {
-                    checkHoleEntry(world, ball);
-                }
                 return new State(pos, Vec3d.ZERO, Vec3d.ZERO, true);
             }
         } else {
@@ -132,6 +127,7 @@ public class GolfPhysicsEngine {
         Vec3d currentVel = newVel;
         Vec3d currentSpin = spin;
         boolean currentlyOnGround = onGround;
+        boolean stepUppedInThisTick = false;
 
         // 4. Ray/Sphere sweep movement tick by tick
         for (int i = 0; i < substeps; i++) {
@@ -140,6 +136,48 @@ public class GolfPhysicsEngine {
             SphereCollision collision = resolveSphereCollision(world, nextCenter, currentCenter, config.radius());
 
             if (collision.hit()) {
+                // --- Step-Up Response Logic ---
+                if (collision.isStepUp()) {
+                    currentCenter = collision.resolvedPos();
+
+                    if(!stepUppedInThisTick) {
+                        stepUppedInThisTick = true;
+
+                        double velX = currentVel.x;
+                        double velZ = currentVel.z;
+                        double horizSpeedSq = velX * velX + velZ * velZ;
+
+                        if (horizSpeedSq > 1e-6) {
+                            double horizSpeed = Math.sqrt(horizSpeedSq);
+                            double stepHeight = collision.stepHeight(); // e.g. box.maxY - previousBottomY
+                            double gravity = config.gravity(); // 0.035 blocks/tick^2
+
+                            // Minimum speed needed to overcome potential energy of step height: v = sqrt(2 * g * h)
+                            double requiredSpeed = Math.sqrt(2.0 * gravity * stepHeight);
+
+                            if (horizSpeed >= requiredSpeed) {
+                                // --- HIGH SPEED: Convert horizontal speed to vertical climb ---
+                                double conversionFactor = 0.35;// Transfer ~35% of horizontal speed into vertical velocity
+                                double addedVelY = horizSpeed * conversionFactor;
+                                // Conserve kinetic energy
+                                double remainingHorizSpeedSq = Math.max(0.0, horizSpeedSq - (addedVelY * addedVelY));
+                                double scale = Math.sqrt(remainingHorizSpeedSq) / horizSpeed;
+
+                                currentVel = new Vec3d(velX * scale, currentVel.y + addedVelY, velZ * scale);
+                            } else {
+                                // --- LOW SPEED: Rebound off step face and roll back under gravity ---
+                                double reboundFactor = 0.25; // Energy retained on horizontal bounce
+                                double smallVerticalPop = horizSpeed * 0.15; // Minor upward nudge
+
+                                // Reverse horizontal direction so the ball rolls backward
+                                currentVel = new Vec3d(-velX * reboundFactor, currentVel.y + smallVerticalPop, -velZ * reboundFactor);
+                            }
+                        }
+                    }
+                    continue;
+                }
+
+                // --- Regular Collision Response (Walls, Bounces, Slopes) ---
                 Vec3d normal = collision.normal();
                 double impactSpeed = currentVel.length();
                 BlockPos impactBlockPos = BlockPos.ofFloored(collision.resolvedPos().subtract(normal.multiply(config.radius() + 0.05)));
@@ -262,93 +300,156 @@ public class GolfPhysicsEngine {
                 intendedCenter.x + radius, intendedCenter.y + radius, intendedCenter.z + radius
         );
         Iterable<VoxelShape> shapes = world.getBlockCollisions(null, searchBox);
-        Vec3d currentCenter = intendedCenter;
-        Vec3d accumulatedNormal = Vec3d.ZERO;
+
+        final double radiusSq = radius * radius;
+        final double previousBottomY = previousCenter.y - radius;
+        final double previousTopY = previousCenter.y + radius;
+        double currentX = intendedCenter.x;
+        double currentY = intendedCenter.y;
+        double currentZ = intendedCenter.z;
+        double accNormX = 0.0;
+        double accNormY = 0.0;
+        double accNormZ = 0.0;
+
         boolean collided = false;
+        boolean stepUpOccurred = false;
+        double recordedStepHeight = 0.0;
 
         for (VoxelShape shape : shapes) {
             for (Box box : shape.getBoundingBoxes()) {
-                double closestX = Math.max(box.minX, Math.min(currentCenter.x, box.maxX));
-                double closestY = Math.max(box.minY, Math.min(currentCenter.y, box.maxY));
-                double closestZ = Math.max(box.minZ, Math.min(currentCenter.z, box.maxZ));
+                double closestX = Math.max(box.minX, Math.min(currentX, box.maxX));
+                double closestY = Math.max(box.minY, Math.min(currentY, box.maxY));
+                double closestZ = Math.max(box.minZ, Math.min(currentZ, box.maxZ));
 
-                double dx = currentCenter.x - closestX;
-                double dy = currentCenter.y - closestY;
-                double dz = currentCenter.z - closestZ;
+                double dx = currentX - closestX;
+                double dy = currentY - closestY;
+                double dz = currentZ - closestZ;
                 double distanceSq = dx * dx + dy * dy + dz * dz;
 
-                boolean centerInsideX = currentCenter.x >= box.minX && currentCenter.x <= box.maxX;
-                boolean centerInsideZ = currentCenter.z >= box.minZ && currentCenter.z <= box.maxZ;
+                boolean centerInsideX = currentX >= box.minX && currentX <= box.maxX;
+                boolean centerInsideZ = currentZ >= box.minZ && currentZ <= box.maxZ;
 
-                // Only check edge support if the face lies on an OUTER block boundary (not an internal hole rim)
-                boolean hasEdgeSupport = false;
-                if (!centerInsideX || !centerInsideZ) {
-                    if (!centerInsideX) {
-                        boolean isWestOuterBoundary = Math.abs(box.minX - Math.floor(box.minX)) < 0.001;
-                        boolean isEastOuterBoundary = Math.abs(box.maxX - Math.ceil(box.maxX)) < 0.001;
+                // 1. Y-height check for top surface contact
+                boolean isTopSurfaceContact = false;
+                if (currentY >= box.maxY - 0.025
+                        && currentY - radius <= box.maxY + 0.01
+                        && previousTopY >= box.maxY - 0.05) {
 
-                        if (currentCenter.x < box.minX && isWestOuterBoundary) {
-                            BlockPos westNeighbor = BlockPos.ofFloored(box.minX - 0.5, box.maxY - 0.05, closestZ);
-                            hasEdgeSupport |= hasSurfaceSupportAt(world, westNeighbor, box.maxY);
-                        } else if (currentCenter.x > box.maxX && isEastOuterBoundary) {
-                            BlockPos eastNeighbor = BlockPos.ofFloored(box.maxX + 0.5, box.maxY - 0.05, closestZ);
-                            hasEdgeSupport |= hasSurfaceSupportAt(world, eastNeighbor, box.maxY);
-                        }
+                    if (centerInsideX && centerInsideZ) {
+                        isTopSurfaceContact = true;
+                    } else {
+                        // Only query world state if ball is vertically in range
+                        isTopSurfaceContact = checkEdgeSupport(world, box, currentX, currentZ, closestX, closestZ, centerInsideX, centerInsideZ);
                     }
-                    if (!centerInsideZ) {
-                        boolean isNorthOuterBoundary = Math.abs(box.minZ - Math.floor(box.minZ)) < 0.001;
-                        boolean isSouthOuterBoundary = Math.abs(box.maxZ - Math.ceil(box.maxZ)) < 0.001;
+                }
 
-                        if (currentCenter.z < box.minZ && isNorthOuterBoundary) {
-                            BlockPos northNeighbor = BlockPos.ofFloored(closestX, box.maxY - 0.05, box.minZ - 0.5);
-                            hasEdgeSupport |= hasSurfaceSupportAt(world, northNeighbor, box.maxY);
-                        } else if (currentCenter.z > box.maxZ && isSouthOuterBoundary) {
-                            BlockPos southNeighbor = BlockPos.ofFloored(closestX, box.maxY - 0.05, box.maxZ + 0.5);
-                            hasEdgeSupport |= hasSurfaceSupportAt(world, southNeighbor, box.maxY);
+                // 2. Step-up check using squared horizontal speed
+                boolean isStepLedge = false;
+                if (!isTopSurfaceContact) {
+                    double velX = currentX - previousCenter.x;
+                    double velZ = currentZ - previousCenter.z;
+                    double horizSpeedSq = velX * velX + velZ * velZ;
+
+                    if (horizSpeedSq > 0.000025) { // Equivalent to horizSpeed > 0.005
+                        double stepHeight = box.maxY - previousBottomY;
+                        if (stepHeight > 0.001 && stepHeight <= 0.08 && (currentY - radius) < box.maxY) {
+                            boolean isMovingTowardBlock =
+                                    (previousCenter.x < box.minX && velX > 0.001) ||
+                                            (previousCenter.x > box.maxX && velX < -0.001) ||
+                                            (previousCenter.z < box.minZ && velZ > 0.001) ||
+                                            (previousCenter.z > box.maxZ && velZ < -0.001);
+                            if (isMovingTowardBlock) {
+                                isStepLedge = true;
+                            }
                         }
                     }
                 }
 
-                boolean isTopSurfaceContact = (currentCenter.y >= box.maxY - 0.025)
-                        && (currentCenter.y - radius <= box.maxY + 0.01)
-                        && (previousCenter.y + radius >= box.maxY - 0.05)
-                        && ((centerInsideX && centerInsideZ) || hasEdgeSupport);
-
-                if (distanceSq < radius * radius || isTopSurfaceContact) {
+                // 3. Resolve collision response
+                if (distanceSq < radiusSq || isTopSurfaceContact || isStepLedge) {
                     collided = true;
-                    Vec3d pushNormal;
+                    double pushX, pushY, pushZ;
                     double penetrationDepth;
 
                     if (isTopSurfaceContact) {
-                        pushNormal = new Vec3d(0, 1, 0);
-                        penetrationDepth = Math.max(0.0, radius - (currentCenter.y - box.maxY));
+                        pushX = 0.0; pushY = 1.0; pushZ = 0.0;
+                        penetrationDepth = Math.max(0.0, (box.maxY + radius) - currentY);
+                    } else if (isStepLedge) {
+                        pushX = 0.0; pushY = 1.0; pushZ = 0.0;
+                        penetrationDepth = Math.max(0.0, (box.maxY + radius) - currentY);
+                        stepUpOccurred = true;
+                        recordedStepHeight = box.maxY - previousBottomY;
                     } else if (distanceSq > 0.00001) {
                         double distance = Math.sqrt(distanceSq);
-                        pushNormal = new Vec3d(dx / distance, dy / distance, dz / distance);
+                        pushX = dx / distance;
+                        pushY = dy / distance;
+                        pushZ = dz / distance;
                         penetrationDepth = radius - distance;
                     } else {
-                        pushNormal = new Vec3d(0, 1, 0);
-                        penetrationDepth = radius + (box.maxY - currentCenter.y);
+                        pushX = 0.0; pushY = 1.0; pushZ = 0.0;
+                        penetrationDepth = radius + (box.maxY - currentY);
                     }
 
-                    accumulatedNormal = accumulatedNormal.add(pushNormal);
-                    currentCenter = currentCenter.add(pushNormal.multiply(penetrationDepth));
+                    accNormX += pushX;
+                    accNormY += pushY;
+                    accNormZ += pushZ;
+                    currentX += pushX * penetrationDepth;
+                    currentY += pushY * penetrationDepth;
+                    currentZ += pushZ * penetrationDepth;
 
-                    System.out.printf("[COLLISION DEBUG] Box X:[%.2f..%.2f] Y_max:%.2f | Center: [%.4f, %.4f] | centerInsideX: %b | edgeSupp: %b | topContact: %b | PushNorm: %s | Pen: %.4f%n",
+                    //debug
+                    System.out.printf("[COLLISION DEBUG] Box X:[%.2f..%.2f] Y_max:%.2f | Center: [%.4f, %.4f] | centerInsideX: %b | topContact: %b | stepUp: %b | Pen: %.4f | stepHeight: %.4f%n",
                             box.minX, box.maxX, box.maxY,
-                            currentCenter.x, currentCenter.y,
-                            centerInsideX, hasEdgeSupport, isTopSurfaceContact,
-                            pushNormal, penetrationDepth);
+                            currentX, currentY,
+                            centerInsideX, isTopSurfaceContact, isStepLedge,
+                            penetrationDepth, recordedStepHeight);
                 }
             }
         }
+
         Vec3d finalNormal = Vec3d.ZERO;
         if (collided) {
-            double lenSq = accumulatedNormal.lengthSquared();
-            finalNormal = lenSq > 1e-6 ? accumulatedNormal.normalize() : new Vec3d(0, 1, 0);
+            double lenSq = accNormX * accNormX + accNormY * accNormY + accNormZ * accNormZ;
+            if (lenSq > 1e-6) {
+                double invLen = 1.0 / Math.sqrt(lenSq);
+                finalNormal = new Vec3d(accNormX * invLen, accNormY * invLen, accNormZ * invLen);
+            } else {
+                finalNormal = new Vec3d(0, 1, 0);
+            }
         }
 
-        return new SphereCollision(currentCenter, finalNormal, collided);
+        return new SphereCollision(new Vec3d(currentX, currentY, currentZ), finalNormal, collided, stepUpOccurred, recordedStepHeight);
+    }
+
+    /**
+     * Helper: edge support evaluation
+     */
+    private static boolean checkEdgeSupport(World world, Box box, double currentX, double currentZ, double closestX, double closestZ, boolean centerInsideX, boolean centerInsideZ) {
+        if (!centerInsideX) {
+            boolean isWestOuterBoundary = Math.abs(box.minX - Math.floor(box.minX)) < 0.001;
+            boolean isEastOuterBoundary = Math.abs(box.maxX - Math.ceil(box.maxX)) < 0.001;
+
+            if (currentX < box.minX && isWestOuterBoundary) {
+                BlockPos westNeighbor = BlockPos.ofFloored(box.minX - 0.5, box.maxY - 0.05, closestZ);
+                if (hasSurfaceSupportAt(world, westNeighbor, box.maxY)) return true;
+            } else if (currentX > box.maxX && isEastOuterBoundary) {
+                BlockPos eastNeighbor = BlockPos.ofFloored(box.maxX + 0.5, box.maxY - 0.05, closestZ);
+                if (hasSurfaceSupportAt(world, eastNeighbor, box.maxY)) return true;
+            }
+        }
+        if (!centerInsideZ) {
+            boolean isNorthOuterBoundary = Math.abs(box.minZ - Math.floor(box.minZ)) < 0.001;
+            boolean isSouthOuterBoundary = Math.abs(box.maxZ - Math.ceil(box.maxZ)) < 0.001;
+
+            if (currentZ < box.minZ && isNorthOuterBoundary) {
+                BlockPos northNeighbor = BlockPos.ofFloored(closestX, box.maxY - 0.05, box.minZ - 0.5);
+                if (hasSurfaceSupportAt(world, northNeighbor, box.maxY)) return true;
+            } else if (currentZ > box.maxZ && isSouthOuterBoundary) {
+                BlockPos southNeighbor = BlockPos.ofFloored(closestX, box.maxY - 0.05, box.maxZ + 0.5);
+                if (hasSurfaceSupportAt(world, southNeighbor, box.maxY)) return true;
+            }
+        }
+        return false;
     }
 
     /**

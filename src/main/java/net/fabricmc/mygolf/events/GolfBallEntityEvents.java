@@ -202,7 +202,6 @@ public class GolfBallEntityEvents {
                         fireworkStack
                 );
                 rocket.setVelocity(0.0, 0.45, 0.0);
-                rocket.velocityModified = true;
                 serverWorld.spawnEntity(rocket);
 
                 /// Particles

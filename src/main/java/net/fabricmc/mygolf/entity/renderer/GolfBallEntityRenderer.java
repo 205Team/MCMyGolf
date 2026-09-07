@@ -36,9 +36,14 @@ public class GolfBallEntityRenderer extends EntityRenderer<GolfBallEntity> {
     private final GolfBallEntityModel model;
     public static final Identifier BLANK_BEAM_TEXTURE = new Identifier(CommonStr.modId, "textures/entity/blank_beam.png");
     private static final Identifier FLAG_ICON_TEXTURE = new Identifier(CommonStr.modId, "textures/item/flag_overlay.png");
-    private static final Identifier ARROW_TEXTURE = new Identifier(CommonStr.modId, "textures/misc/arrow.png");
+    private static final Identifier ARROW_TEXTURE = new Identifier(CommonStr.modId, "textures/misc/arrow_bw.png");
+    private static final Identifier NUM_FONT = new Identifier(CommonStr.modId, "num_font");
     private static final double SLOW_SPEED_THRESHOLD_SQ = 0.1 * 0.1; // Ball speed upper limit for beam rendering
     private static final int MAX_TRAJECTORY_STEPS = 15; // * 0.05 seconds of trajectory predicted
+    private static float lastLoft = Float.NaN;
+    private static long loftChangeTime = 0;
+    private static final long DISPLAY_DURATION_MS = 1100; // 3 seconds total duration
+    private static final long FADE_DURATION_MS = 500;
 
     public GolfBallEntityRenderer(EntityRendererFactory.Context context) {
         super(context);
@@ -113,7 +118,7 @@ public class GolfBallEntityRenderer extends EntityRenderer<GolfBallEntity> {
 
             // Modulo prevents negative progress when ticks exceed 8
             float ticksInCurrentHop = remainingTicks % hopDuration;
-            if (ticksInCurrentHop == 0.0F && remainingTicks > 0.0F) {
+            if (ticksInCurrentHop == 0.0F) {
                 ticksInCurrentHop = hopDuration; // Handle exact boundary frames
             }
 
@@ -341,33 +346,86 @@ public class GolfBallEntityRenderer extends EntityRenderer<GolfBallEntity> {
         float width = 0.5f;
         float length = 0.5f;
         float halfWidth = width / 2.0f;
-        float startOffset = 0.35f; // Offset slightly in front of ball center
+        float startOffset = 0.25f; // Offset slightly in front of ball center
 
         double loftRad = Math.toRadians(loft);
         float cosLoft = (float) Math.cos(loftRad);
 
-        // Project both the start and end offsets onto the XZ plane
+        // Shadow
         float shadowStartOffset = startOffset * cosLoft;
         float shadowEndOffset = (startOffset + length) * cosLoft;
-
-        // Fade tip opacity as it raises higher off the ground
-        int tipAlpha = (int) (80 * cosLoft);
-
         matrices.push();
         MatrixStack.Entry shadowEntry = matrices.peek();
-        drawVertex(shadowEntry, buffer, -halfWidth, 0.0f, shadowEndOffset, 0.0f, 0.0f, 0, 0, 0, tipAlpha, light);
-        drawVertex(shadowEntry, buffer,  halfWidth, 0.0f, shadowEndOffset, 1.0f, 0.0f, 0, 0, 0, tipAlpha, light);
-        drawVertex(shadowEntry, buffer,  halfWidth, 0.0f, shadowStartOffset,          1.0f, 1.0f, 0, 0, 0, 80, light);
-        drawVertex(shadowEntry, buffer, -halfWidth, 0.0f, shadowStartOffset,          0.0f, 1.0f, 0, 0, 0, 80, light);
+        drawVertex(shadowEntry, buffer, -halfWidth, 0.0f, shadowEndOffset, 0.0f, 0.0f, 0, 0, 0, 95, light);
+        drawVertex(shadowEntry, buffer,  halfWidth, 0.0f, shadowEndOffset, 1.0f, 0.0f, 0, 0, 0, 95, light);
+        drawVertex(shadowEntry, buffer,  halfWidth, 0.0f, shadowStartOffset,          1.0f, 1.0f, 0, 0, 0, 95, light);
+        drawVertex(shadowEntry, buffer, -halfWidth, 0.0f, shadowStartOffset,          0.0f, 1.0f, 0, 0, 0, 95, light);
         matrices.pop();
 
+        // Arrow
+        float yOffset = GolfBallEntity.BALL_HEIGHT / 2;
+        float t = MathHelper.clamp(-loft / 60, 0.0f, 1.0f);
+        int redR = 220,  redG = 96, redB = 96;  // Grass Green (#4CAF50)
+        int blueR  = 100, blueG  = 160, blueB  = 255; // Sky Blue    (#64B4FF)
+        int r = (int) (redR + t * (blueR - redR));
+        int g = (int) (redG + t * (blueG - redG));
+        int b = (int) (redB + t * (blueB - redB));
+        int alpha = 180; // Opacity (0-255)
         matrices.push();
         matrices.multiply(RotationAxis.POSITIVE_X.rotationDegrees(loft));
         MatrixStack.Entry arrowEntry = matrices.peek();
-        drawVertex(arrowEntry, buffer, -halfWidth, 0.0f, startOffset + length, 0.0f, 0.0f, 255, 255, 255, 100, light); // Bottom-Left
-        drawVertex(arrowEntry, buffer,  halfWidth, 0.0f, startOffset + length, 1.0f, 0.0f, 255, 255, 255, 100, light); // Bottom-Right
-        drawVertex(arrowEntry, buffer,  halfWidth, 0.0f, startOffset,          1.0f, 1.0f, 255, 255, 255, 100, light); // Top-Right
-        drawVertex(arrowEntry, buffer, -halfWidth, 0.0f, startOffset,          0.0f, 1.0f, 255, 255, 255, 100, light); // Top-Left
+        drawVertex(arrowEntry, buffer, -halfWidth, yOffset, startOffset + length, 0.0f, 0.0f, r, g, b, alpha, light); // Bottom-Left
+        drawVertex(arrowEntry, buffer,  halfWidth, yOffset, startOffset + length, 1.0f, 0.0f, r, g, b, alpha, light); // Bottom-Right
+        drawVertex(arrowEntry, buffer,  halfWidth, yOffset, startOffset,          1.0f, 1.0f, r, g, b, alpha, light); // Top-Right
+        drawVertex(arrowEntry, buffer, -halfWidth, yOffset, startOffset,          0.0f, 1.0f, r, g, b, alpha, light); // Top-Left
+
+        // Text
+        long currentTime = System.currentTimeMillis();
+        if (loft != lastLoft) {
+            lastLoft = loft;
+            loftChangeTime = currentTime;
+        }
+        long elapsed = currentTime - loftChangeTime;
+        if (elapsed < DISPLAY_DURATION_MS) {
+            // 1. Calculate Fade Alpha
+            float alphaFactor = 1.0f;
+            long fadeStart = DISPLAY_DURATION_MS - FADE_DURATION_MS;
+            if (elapsed > fadeStart) {
+                alphaFactor = 1.0f - ((float) (elapsed - fadeStart) / FADE_DURATION_MS);
+            }
+            int textAlpha = (int) (alphaFactor * 255);
+            if (textAlpha > 4) {
+                int textColor = (textAlpha << 24) | 0xE1E9E1; // White text with dynamic alpha
+                // 2. Position Text on Arrow Surface
+                matrices.push();
+                float midZ = startOffset + 0.11f;
+                matrices.translate(0.0D, yOffset + 0.002D, midZ);
+                matrices.multiply(RotationAxis.POSITIVE_X.rotationDegrees(-90.0f));
+                matrices.multiply(RotationAxis.POSITIVE_Z.rotationDegrees(180.0f));
+                float textScale = 0.03f;
+                matrices.scale(textScale, -textScale, textScale);
+                // 3. Center and Draw Text
+                TextRenderer textRenderer = MinecraftClient.getInstance().textRenderer;
+                String loftText = Math.round(Math.abs(loft)) + "°";
+                float xOffset = 2.0f;
+                float yTextOffset = -4.5f;
+                Text formattedText = Text.literal(loftText)
+                        .setStyle(Style.EMPTY.withFont(NUM_FONT));
+                textRenderer.draw(
+                        formattedText,
+                        xOffset,
+                        yTextOffset,
+                        textColor,
+                        false,
+                        matrices.peek().getPositionMatrix(),
+                        vertexConsumers,
+                        TextRenderer.TextLayerType.NORMAL,
+                        0,
+                        light
+                );
+                matrices.pop();
+            }
+        }
         matrices.pop();
 
         matrices.pop();
@@ -477,7 +535,7 @@ public class GolfBallEntityRenderer extends EntityRenderer<GolfBallEntity> {
         matrices.push();
 
         // Position label height above the ball
-        double offsetY = entity.getHeight() + 0.2D;
+        double offsetY = entity.getHeight() + 0.12D;
         matrices.translate(0.0D, offsetY, 0.0D);
 
         matrices.multiply(this.dispatcher.getRotation());

@@ -272,6 +272,7 @@ public class GolfBallEntity extends Entity {
             }
             // 2. Soft Reset (Tick 3): Snap once back to last known SAFE position
             if (this.stuckTicks == 3 && !this.lastSafePos.equals(Vec3d.ZERO)) {
+                System.out.println("Clipping Tick 3");
                 this.setVelocity(Vec3d.ZERO);
                 this.setPosition(this.lastSafePos.x, this.lastSafePos.y + 0.05, this.lastSafePos.z);
                 return true; // Skip this tick's physics step
@@ -318,10 +319,12 @@ public class GolfBallEntity extends Entity {
         this.setSpin(newState.spin());
         this.setOnGround(newState.onGround());
         this.velocityDirty = true;
-        this.velocityModified = true;
 
         if (newState.onGround() && newState.vel().lengthSquared() < 1e-6 && newState.spin().lengthSquared() < 1e-4) {
-            this.setSleeping(true);
+            if (!this.isSleeping()) {
+                GolfPhysicsEngine.checkHoleEntry(this.getWorld(), this);
+                this.setSleeping(true);
+            }
         }
 
         // Triggers block interactions
@@ -538,7 +541,6 @@ public class GolfBallEntity extends Entity {
 
         this.wakeUp();
         this.setOnGround(false);
-        this.velocityModified = true;
     }
 
     public static GolfBallEntity getClosestBall(World world, PlayerEntity player, double radius, boolean checkOwnership) {
@@ -629,7 +631,7 @@ public class GolfBallEntity extends Entity {
         if (type == MovementType.PISTON) {
             if (movement.lengthSquared() > 1e-6) {
                 Vec3d pushDir = movement.normalize();
-                this.applyImpulse(pushDir.multiply(0.8D));
+                this.applyImpulse(pushDir.multiply(0.6D));
             }
         }
     }
@@ -685,8 +687,8 @@ public class GolfBallEntity extends Entity {
 
             ItemEntity itemEntity = this.dropStack(ballStack);
             if (itemEntity != null) {
-                itemEntity.setVelocity(0, 0.3, 0);
-                itemEntity.velocityModified = true; // Notifies client of velocity change
+                itemEntity.setVelocity(new Vec3d(0, 0.3, 0));
+                itemEntity.velocityModified = true;
             }
             this.discard();
             return true;

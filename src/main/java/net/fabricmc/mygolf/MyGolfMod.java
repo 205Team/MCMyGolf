@@ -33,6 +33,8 @@ public class MyGolfMod implements ModInitializer {
                 GolfBallEntityEvents.registerEvents();
                 //注册接收器
                 RegisterReceivers.register();
+                //注册发射器行为
+                registerDispenserBehaviors.register();
 
                 LOGGER.info("Hello Fabric world!");
         }

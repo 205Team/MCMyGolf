@@ -79,6 +79,7 @@ public class GolfBall extends BaseItem implements DyeableItem {
                 final Direction side = hitResult.getSide();
                 final Vec3d hitPos = hitResult.getPos();
                 final BlockPos blockPos = hitResult.getBlockPos();
+                System.out.printf("raycast hit Pos [X: %.4f, Y: %.4f, Z: %.4f] ", hitPos.x, hitPos.y, hitPos.z);
 
                 double spawnX = hitPos.x + (side.getOffsetX() * (radius + 0.01));
                 double spawnY = hitPos.y;
@@ -92,13 +93,14 @@ public class GolfBall extends BaseItem implements DyeableItem {
 
                 // Set initial trial position
                 golfBallEntity.updatePosition(spawnX, spawnY, spawnZ);
+                golfBallEntity.setVelocity(Vec3d.ZERO);
+                golfBallEntity.setOnGround(side == Direction.UP);
 
-                // Resolve wall clipping against hollow/complex block geometry (Composters, Cauldrons, Hoppers)
+                // Resolve wall clipping against hollow/complex block geometry
                 VoxelShape blockShape = level.getBlockState(blockPos).getCollisionShape(level, blockPos);
                 if (blockShape.isEmpty()) {
                     blockShape = level.getBlockState(blockPos).getOutlineShape(level, blockPos);
                 }
-
                 if (!blockShape.isEmpty()) {
                     for (Box wallBox : blockShape.getBoundingBoxes()) {
                         Box worldWallBox = wallBox.offset(blockPos);
@@ -123,8 +125,27 @@ public class GolfBall extends BaseItem implements DyeableItem {
                         }
                     }
                 }
-                golfBallEntity.setVelocity(Vec3d.ZERO);
-                golfBallEntity.setOnGround(side == Direction.UP);
+
+                // 2. Resolve clipping into neighboring/adjacent blocks
+                Iterable<VoxelShape> neighborCollisions = level.getBlockCollisions(golfBallEntity, golfBallEntity.getBoundingBox());
+                for (VoxelShape shape : neighborCollisions) {
+                    for (Box worldWallBox : shape.getBoundingBoxes()) {
+                        Box ballBox = golfBallEntity.getBoundingBox();
+                        if (ballBox.intersects(worldWallBox)) {
+                            double minXDist = Math.abs((spawnX - radius) - worldWallBox.maxX);
+                            double maxXDist = Math.abs((spawnX + radius) - worldWallBox.minX);
+                            double minZDist = Math.abs((spawnZ - radius) - worldWallBox.maxZ);
+                            double maxZDist = Math.abs((spawnZ + radius) - worldWallBox.minZ);
+                            double minDist = Math.min(Math.min(minXDist, maxXDist), Math.min(minZDist, maxZDist));
+
+                            if (minDist == minXDist) spawnX = worldWallBox.maxX + radius + 0.001;
+                            else if (minDist == maxXDist) spawnX = worldWallBox.minX - radius - 0.001;
+                            else if (minDist == minZDist) spawnZ = worldWallBox.maxZ + radius + 0.001;
+                            else if (minDist == maxZDist) spawnZ = worldWallBox.minZ - radius - 0.001;
+                            golfBallEntity.updatePosition(spawnX, spawnY, spawnZ);
+                        }
+                    }
+                }
 
             }else {
                 final var unit = hitResult.getPos().subtract(user.getPos()).normalize();
@@ -201,6 +222,16 @@ public class GolfBall extends BaseItem implements DyeableItem {
     public void removeColor(ItemStack stack) {
         DyeableItem.super.removeColor(stack);
         sanitizeNbt(stack); // Ensures empty 'display' tags are deleted immediately
+    }
+
+    @Override
+    public boolean hasRecipeRemainder() {
+        return true;
+    }
+
+    @Override
+    public ItemStack getRecipeRemainder(ItemStack stack) {
+        return new ItemStack(this);
     }
 
     public static void sanitizeNbt(ItemStack stack) {

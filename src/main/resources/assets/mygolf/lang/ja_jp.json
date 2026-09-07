@@ -16,10 +16,11 @@
   "book.mygolf.guide.title": "ゴルフ説明",
   "book.mygolf.guide.page1": "\n\n\n\n§4ゴルフガイド\n§6ルール：クラブでボールをシュートしてフラグスティックにあるカップに入れる",
   "book.mygolf.guide.page2": "§3ゴルフボール\n§6右クリックで置く\n§6ボールを手に持って、もしくは何も持たずに、ボールを右クリックで回収\n\n§3フラグスティック\n§6土か草ブロックに使用\n\n§3ゴルフクラブ\n§6スニーキング右クリックでロフトを変え、\n§6ボールに近付いてチャージ＆シュート",,
-  "message.mygolf.hole_in_one": "★ HOLE IN ONE! ★",
-  "message.mygolf.eagle": "Eagle!",
-  "message.mygolf.birdie": "Birdie!",
-  "message.mygolf.par": "Par!",
-  "message.mygolf.finished_in": "finished in %s strokes!",
-  "message.mygolf.time": "(%s)"
+  "message.mygolf.hole_in_one": "★ ホールインワン! ★",
+  "message.mygolf.eagle": "イーグル!",
+  "message.mygolf.birdie": "バーディー!",
+  "message.mygolf.par": "パー!",
+  "message.mygolf.finished_in": "打数%sでフィニッシュ!",
+  "message.mygolf.time": "(%s)",
+  "message.mygolf.time_over_day": "(>1日)"
 }

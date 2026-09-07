@@ -26,10 +26,10 @@ import net.minecraft.world.World;
 
 public class GolfClubItem extends Item implements ItemAbstract {
 
-    public static final float[] LOFT_PRESETS = { 0.0f, -15.0f, -40.0f, -60.0f, -75.0f };   // Preset loft angles (Negative pitch = UP in Minecraft)
+    public static final float[] LOFT_PRESETS = { 0.0f, -15.0f, -40.0f, -60.0f };   // Preset loft angles (Negative pitch = UP in Minecraft)
     private static final int MAX_USE_TIME = 72000; // 定义蓄力的最长时间，单位为 tick
     public static final int MIN_CHARGE_TICKS = 5;  // * 0.05 seconds before a shot fires
-    public static final int MAX_CHARGE_TICKS = 20; // * 0.05 seconds to reach 100% power
+    public static final int MAX_CHARGE_TICKS = 24; // * 0.05 seconds to reach 100% power
     public static final int MAX_LOOPS = 3; // Maximum allowed loops
     public static final double MAX_SHOT_POWER = 3.0; // Max speed multiplier
     public static final int COOLDOWN_TICKS = 15; // * 0.05 second cooldown
@@ -171,9 +171,6 @@ public class GolfClubItem extends Item implements ItemAbstract {
             // Play gear click sound and send action bar message
             world.playSound(null, player.getBlockPos(), SoundEvents.UI_BUTTON_CLICK.value(),
                     SoundCategory.PLAYERS, 0.4f, 1.2f);
-
-            player.sendMessage(Text.literal("Loft set to: " + LOFT_PRESETS[nextIndex])
-                    .formatted(Formatting.GREEN), true); // true = displays above action bar
         }
     }
 
@@ -204,6 +201,16 @@ public class GolfClubItem extends Item implements ItemAbstract {
     @Override
     public UseAction getUseAction(ItemStack stack) {
         return UseAction.BOW;
+    }
+
+    @Override
+    public boolean hasRecipeRemainder() {
+        return true;
+    }
+
+    @Override
+    public ItemStack getRecipeRemainder(ItemStack stack) {
+        return new ItemStack(this);
     }
 
     //默认设置

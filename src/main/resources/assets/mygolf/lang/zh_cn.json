@@ -16,10 +16,11 @@
   "book.mygolf.guide.title": "高尔夫球说明",
   "book.mygolf.guide.page1": "\n\n\n\n§4高尔夫球介绍\n§6游戏规则：挥动球杆将球打入红旗杆处球洞中",
   "book.mygolf.guide.page2": "§3高尔夫球\n§6右键放置\n§6空手或手持高尔夫球时，右键高尔夫球实体可回收\n\n§3红旗杆\n§6对着泥土或草方块使用\n\n§3高尔夫球杆\n§6靠近高尔夫球\n§6潜行右键改变角度，右键蓄力击打",
-  "message.mygolf.hole_in_one": "★ HOLE IN ONE! ★",
-  "message.mygolf.eagle": "Eagle!",
-  "message.mygolf.birdie": "Birdie!",
-  "message.mygolf.par": "Par!",
-  "message.mygolf.finished_in": "finished in %s strokes!",
-  "message.mygolf.time": "(%s)"
+  "message.mygolf.hole_in_one": "★ 一杆进洞! ★",
+  "message.mygolf.eagle": "老鹰球!",
+  "message.mygolf.birdie": "小鸟球!",
+  "message.mygolf.par": "标准杆!",
+  "message.mygolf.finished_in": "%s杆进洞!",
+  "message.mygolf.time": "(%s)",
+  "message.mygolf.time_over_day": "(>1天)"
 }
