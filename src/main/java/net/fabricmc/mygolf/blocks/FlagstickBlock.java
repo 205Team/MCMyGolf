@@ -59,7 +59,7 @@ public class FlagstickBlock extends BaseBlockWithEntity {
                         .copy(Blocks.STONE)
                         .pistonBehavior(PistonBehavior.DESTROY)
                         .nonOpaque()
-                        .luminance(state -> 15)
+                        .luminance(state -> state.get(BEAM_TOGGLE) ? 12 : 0)
         );
     }
 

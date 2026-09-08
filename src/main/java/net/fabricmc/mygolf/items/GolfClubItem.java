@@ -1,10 +1,8 @@
 package net.fabricmc.mygolf.items;
 
-import net.fabricmc.mygolf.MyGolfModClient;
 import net.fabricmc.mygolf.entity.GolfBallEntity;
 import net.fabricmc.mygolf.items.base.ItemAbstract;
 import net.fabricmc.mygolf.registry.RegisterSounds;
-import net.fabricmc.mygolf.tools.DebugUtil;
 import net.fabricmc.mygolf.tools.StringTool;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.player.PlayerEntity;
@@ -13,8 +11,6 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.sound.SoundCategory;
 import net.minecraft.sound.SoundEvents;
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
 import net.minecraft.util.Hand;
 import net.minecraft.util.TypedActionResult;
 import net.minecraft.util.UseAction;
@@ -26,7 +22,8 @@ import net.minecraft.world.World;
 
 public class GolfClubItem extends Item implements ItemAbstract {
 
-    public static final float[] LOFT_PRESETS = { 0.0f, -15.0f, -40.0f, -60.0f };   // Preset loft angles (Negative pitch = UP in Minecraft)
+    public static final float[] LOFT_PRESETS = { 0.0f, -15.0f, -30.0f, -45.0f, -60.0f };   // Preset loft angles (Negative pitch = UP in Minecraft)
+    public static final float HIGHEST_LOFT = Math.abs(LOFT_PRESETS[LOFT_PRESETS.length - 1]);
     private static final int MAX_USE_TIME = 72000; // 定义蓄力的最长时间，单位为 tick
     public static final int MIN_CHARGE_TICKS = 5;  // * 0.05 seconds before a shot fires
     public static final int MAX_CHARGE_TICKS = 24; // * 0.05 seconds to reach 100% power
@@ -178,7 +175,7 @@ public class GolfClubItem extends Item implements ItemAbstract {
         float linearProgress = (chargeTicks % MAX_CHARGE_TICKS) / (float) MAX_CHARGE_TICKS;
 
         // Normalize loft (0° to 90°) to a 0.0f -> 1.0f range
-        float normalizedLoft = MathHelper.clamp(-loftDegrees / 90.0f, 0.0f, 1.0f);
+        float normalizedLoft = MathHelper.clamp(-loftDegrees / HIGHEST_LOFT, 0.0f, 1.0f);
 
         // Dynamic Exponent Interpolation:
         // Low Loft  (0°)  -> Exponent 2.2f (Starts slow, skyrockets near max power)

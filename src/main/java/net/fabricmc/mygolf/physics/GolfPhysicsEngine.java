@@ -8,6 +8,7 @@ import net.minecraft.block.Blocks;
 import net.minecraft.registry.tag.BlockTags;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Box;
+import net.minecraft.util.math.Direction;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.util.shape.VoxelShape;
 import net.minecraft.world.World;
@@ -136,6 +137,9 @@ public class GolfPhysicsEngine {
             SphereCollision collision = resolveSphereCollision(world, nextCenter, currentCenter, config.radius());
 
             if (collision.hit()) {
+                if (isRealTick) {
+                    logSurroundingBlocks(world, collision.resolvedPos(), 1); //
+                }
                 // --- Step-Up Response Logic ---
                 if (collision.isStepUp()) {
                     currentCenter = collision.resolvedPos();
@@ -274,6 +278,28 @@ public class GolfPhysicsEngine {
                 currentlyOnGround ? currentSpin.multiply(0.98) : currentSpin.multiply(0.99),
                 currentlyOnGround
         );
+    }public static void logSurroundingBlocks(World world, Vec3d collisionPoint, int radius) {
+        BlockPos centerPos = BlockPos.ofFloored(collisionPoint);
+        System.out.printf("[SURROUNDING BLOCKS] Center: %s | Exact: [%.4f, %.4f, %.4f]%n",
+                centerPos.toShortString(), collisionPoint.x, collisionPoint.y, collisionPoint.z);
+
+        for (int dy = -radius; dy <= radius; dy++) {
+            for (int dx = -radius; dx <= radius; dx++) {
+                for (int dz = -radius; dz <= radius; dz++) {
+                    BlockPos targetPos = centerPos.add(dx, dy, dz);
+                    BlockState state = world.getBlockState(targetPos);
+
+                    if (!state.isAir()) {
+                        VoxelShape shape = state.getCollisionShape(world, targetPos);
+                        System.out.printf("  Offset [%+d, %+d, %+d] -> %s | MaxY: %.2f | Boxes: %s%n",
+                                dx, dy, dz,
+                                state.getBlock().getName().getString(),
+                                targetPos.getY() + (shape.isEmpty() ? 0 : shape.getMax(Direction.Axis.Y)),
+                                shape.isEmpty() ? "NONE" : shape.getBoundingBoxes());
+                    }
+                }
+            }
+        }
     }
 
     /**

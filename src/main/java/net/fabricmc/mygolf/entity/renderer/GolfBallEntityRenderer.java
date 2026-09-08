@@ -42,7 +42,7 @@ public class GolfBallEntityRenderer extends EntityRenderer<GolfBallEntity> {
     private static final int MAX_TRAJECTORY_STEPS = 15; // * 0.05 seconds of trajectory predicted
     private static float lastLoft = Float.NaN;
     private static long loftChangeTime = 0;
-    private static final long DISPLAY_DURATION_MS = 1100; // 3 seconds total duration
+    private static final long DISPLAY_DURATION_MS = 1200; // 3 seconds total duration
     private static final long FADE_DURATION_MS = 500;
 
     public GolfBallEntityRenderer(EntityRendererFactory.Context context) {
@@ -364,7 +364,7 @@ public class GolfBallEntityRenderer extends EntityRenderer<GolfBallEntity> {
 
         // Arrow
         float yOffset = GolfBallEntity.BALL_HEIGHT / 2;
-        float t = MathHelper.clamp(-loft / 60, 0.0f, 1.0f);
+        float t = MathHelper.clamp(-loft / GolfClubItem.HIGHEST_LOFT, 0.0f, 1.0f);
         int redR = 220,  redG = 96, redB = 96;  // Grass Green (#4CAF50)
         int blueR  = 100, blueG  = 160, blueB  = 255; // Sky Blue    (#64B4FF)
         int r = (int) (redR + t * (blueR - redR));

@@ -1,6 +1,7 @@
 package net.fabricmc.mygolf.items;
 
 import net.fabricmc.mygolf.items.base.BaseItem;
+import net.fabricmc.mygolf.events.client.BookGuiHelper;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.*;
 import net.minecraft.nbt.NbtCompound;
@@ -22,23 +23,31 @@ public class IntroBook extends BaseItem {
         return new IntroBook(defaultSetting());
     }
 
-    //默认设置
     private static Settings defaultSetting() {
         return new Settings().maxCount(1);
     }
 
     @Override
     public TypedActionResult<ItemStack> use(World world, PlayerEntity user, Hand hand) {
-        final var itemStack = user.getStackInHand(hand);
-        ArrayList<String> list = new ArrayList<>();
-        list.add(bookChar("book.mygolf.guide.page1"));
-        list.add(bookChar("book.mygolf.guide.page2"));
+        ItemStack itemStack = user.getStackInHand(hand);
 
-        String filtterd_title = Text.translatable("book.mygolf.guide.filtterd_title").getString();
-        String title = Text.translatable("book.mygolf.guide.title").getString();
-        user.giveItemStack(writtenBook("mygolf", filtterd_title, list, true, title));
-        itemStack.decrement(1);
-        return super.use(world, user, hand);
+        if (world.isClient()) {
+            ArrayList<String> list = new ArrayList<>();
+            list.add(bookChar("book.mygolf.guide.page1"));
+            list.add(bookChar("book.mygolf.guide.page2"));
+            list.add(bookChar("book.mygolf.guide.page3"));
+            list.add(bookChar("book.mygolf.guide.page4"));
+
+            String filtterd_title = Text.translatable("book.mygolf.guide.filtterd_title").getString();
+            String title = Text.translatable("book.mygolf.guide.title").getString();
+
+            ItemStack bookStack = writtenBook("mygolf", filtterd_title, list, true, title);
+
+            // Safely open the client GUI directly
+            BookGuiHelper.openBookScreen(bookStack);
+        }
+
+        return TypedActionResult.success(itemStack, world.isClient());
     }
 
     ///返回成书nbt

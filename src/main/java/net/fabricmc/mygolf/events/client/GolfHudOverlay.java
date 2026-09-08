@@ -32,10 +32,13 @@ public class GolfHudOverlay implements HudRenderCallback {
         float maxAllowedTicks = GolfClubItem.MAX_CHARGE_TICKS * GolfClubItem.MAX_LOOPS;
         if (chargeTicks >= maxAllowedTicks) return;
 
+        float currentLoft = GolfClubItem.getSelectedLoft(activeStack);
+        float powerRatio = GolfClubItem.calculatePowerRatio(chargeTicks, currentLoft);
+        if (powerRatio <= 0.0f) return;
+
         // Determine screen coordinates of the active hotbar slot
         int scaledWidth = drawContext.getScaledWindowWidth();
         int scaledHeight = drawContext.getScaledWindowHeight();
-
         int x;
         int y = scaledHeight - 19; // Standard vertical position for hotbar slot content
 
@@ -48,17 +51,11 @@ public class GolfHudOverlay implements HudRenderCallback {
             x = isRightArm ? (scaledWidth / 2 - 117) : (scaledWidth / 2 + 101);
         }
 
-        // Sawtooth translucent white mask rising bottom to top
-        float powerRatio = (chargeTicks % GolfClubItem.MAX_CHARGE_TICKS) / (float) GolfClubItem.MAX_CHARGE_TICKS;
-        if (powerRatio <= 0.0f) return;
-
         int progressWidth = Math.round(SLOT_SIZE * powerRatio);
-
         int x1 = x;
         int x2 = x + progressWidth;
         int y1 = y;
         int y2 = y + SLOT_SIZE;
-
         int red = (int) (255 * powerRatio);
         int green = (int) (255 * (1.0f - powerRatio));
         int dynamicColor = (MASK_ALPHA << 24) | (red << 16) | (green << 8);
