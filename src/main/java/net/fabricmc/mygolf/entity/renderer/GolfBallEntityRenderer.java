@@ -8,6 +8,7 @@ import net.fabricmc.mygolf.entity.model.GolfBallEntityModel;
 import net.fabricmc.mygolf.global.CommonStr;
 import net.fabricmc.mygolf.items.GolfClubItem;
 import net.fabricmc.mygolf.physics.GolfPhysicsEngine;
+import net.fabricmc.mygolf.tools.DebugUtil;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.font.TextRenderer;
 import net.minecraft.client.network.ClientPlayerEntity;
@@ -502,46 +503,56 @@ public class GolfBallEntityRenderer extends EntityRenderer<GolfBallEntity> {
 
     @Override
     protected void renderLabelIfPresent(GolfBallEntity entity, Text text, MatrixStack matrices, VertexConsumerProvider vertexConsumers, int light) {
+        MinecraftClient client = MinecraftClient.getInstance();
+        ClientPlayerEntity player = client.player;
+        if (player == null) return;
+
+        boolean hasCustomName = entity.hasCustomName();
+        boolean isSneaking = player.isSneaking();
+        if (!hasCustomName && !isSneaking) return;
+
         double squaredDistance = this.dispatcher.getSquaredDistanceToCamera(entity);
-        if (squaredDistance > 4096.0D) {
-            return;
-        }
+        if (squaredDistance > 4096.0D) return;
 
-        MutableText customLabel = entity.hasCustomName()
-                ? entity.getCustomName().copy()
-                : Text.translatable("entity.mygolf.golf_ball_entity");
-        if (entity.hasOwner()) {
-            PlayerEntity localPlayer = MinecraftClient.getInstance().player;
-            if (localPlayer != null && entity.isOwner(localPlayer)) {
-                customLabel.setStyle(customLabel.getStyle().withColor(0x82e782));//green
+        MutableText finalText = Text.empty();
+
+        if (hasCustomName) {
+            MutableText customLabel = entity.getCustomName().copy();
+            if (entity.hasOwner()) {
+                if (entity.isOwner(player)) {
+                    customLabel.setStyle(customLabel.getStyle().withColor(0x82E782)); // green
+                } else {
+                    customLabel.setStyle(customLabel.getStyle().withColor(0xD96C2A)); // red
+                }
             } else {
-                customLabel.setStyle(customLabel.getStyle().withColor(0xD96C2A));//red
+                customLabel.setStyle(customLabel.getStyle().withColor(0xDCEDEE)); // mint
             }
-        } else {
-            customLabel.setStyle(customLabel.getStyle().withColor(0xC5E2E4));//mint
+            finalText.append(customLabel);
         }
+        DebugUtil.logThrottled("hasOwner",entity.hasOwner(),1000);
 
-        int hits = entity.getHitCount();
-        int hitColor = entity.isGoaled() ? 0xECA758 : 0xC5E2E4;//gold/mint
-        String prefix = "[";
-        String suffix = entity.isGoaled() ? "]⛳" : "]";
-        Text dotSeparator = Text.literal("•").setStyle(Style.EMPTY.withColor(0xFFFFFF));
-        Text counterText = Text.literal(prefix + hits + suffix).setStyle(Style.EMPTY.withColor(hitColor));
-        Text hitText = Text.empty().append(dotSeparator).append(counterText);
+        if (isSneaking) {
+            int hits = entity.getHitCount();
+            int hitColor = entity.isGoaled() ? 0xECA758 : 0xDCEDEE; // gold/mint
 
+            // Add a leading space only if a custom name precedes the counter
+            String prefix = "[";
+            String suffix = entity.isGoaled() ? "]⛳" : "]";
 
-        Text finalText = customLabel.append(hitText);
+            Text counterText = Text.literal(prefix + hits + suffix).setStyle(Style.EMPTY.withColor(hitColor));
+            finalText.append(counterText);
+        }
 
         matrices.push();
 
         // Position label height above the ball
-        double offsetY = entity.getHeight() + 0.12D;
+        double offsetY = entity.getHeight() + 0.15D;
         matrices.translate(0.0D, offsetY, 0.0D);
 
         matrices.multiply(this.dispatcher.getRotation());
 
         // Custom text scale (Vanilla default is -0.025F)
-        float scale = -0.010F;
+        float scale = -0.012F;
         matrices.scale(scale, scale, Math.abs(scale));
 
         Matrix4f matrix4f = matrices.peek().getPositionMatrix();
@@ -565,7 +576,7 @@ public class GolfBallEntityRenderer extends EntityRenderer<GolfBallEntity> {
                 light
         );
 
-        // 4. Render label text
+        // Render label text
         textRenderer.draw(
                 finalText,
                 xOffset,
