@@ -87,15 +87,23 @@ public class GolfPhysicsEngine {
             // Check if the center of the ball is submerged in a liquid
             BlockPos currentPos = BlockPos.ofFloored(pos);
             boolean isInFluid = !world.getFluidState(currentPos).isEmpty();
+            BlockState currentBlockState = world.getBlockState(currentPos);
+            boolean isInCobweb = currentBlockState.isOf(Blocks.COBWEB);
 
-            if (isInFluid) {
+            if (isInCobweb) {
+                // Cobweb Physics: High velocity dampening and low gravity trickle
+                double cobwebDrag = 0.25; // Heavily cuts horizontal & vertical momentum per tick
+                double cobwebGravity = config.gravity() * 0.05; // Slow downward fall
+
+                newVel = vel.multiply(cobwebDrag).subtract(0, cobwebGravity, 0);
+                spin = spin.multiply(0.2D); // Rapidly kill rotational energy
+            } else if (isInFluid) {
                 // Fluid Physics: Heavy drag + Buoyancy lift
                 double fluidDrag = 0.82;     // High resistance (slows down fast entries)
-
-                // Effective gravity in water = downward gravity + upward buoyancy
                 double netGravity = -config.gravity() + config.buoyancy(); // Default: -0.035 + 0.028 = -0.007
 
                 newVel = vel.multiply(fluidDrag).add(0, netGravity, 0);
+                spin = spin.multiply(0.5D); // Rapidly kill rotational energy
             } else {
                 // Air Physics: Standard drag + Gravity + Magnus force
                 spin = spin.multiply(0.98D);
